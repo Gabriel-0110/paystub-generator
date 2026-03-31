@@ -476,7 +476,7 @@ function syncGenerationFrequencyFromAssignment({ force = false } = {}) {
   }
 }
 
-function handleGenerationInput() {
+function handleGenerationInput(event) {
   state.generationMode = els.generationMode.value;
   state.generationSequenceType = els.generationSequenceType.value;
   state.generationPayFrequency = els.generationPayFrequency.value;
@@ -484,7 +484,6 @@ function handleGenerationInput() {
   state.generationAnchor = els.generationAnchor.value;
   state.generationAmountMode = els.generationAmountMode.value;
   state.generationFixedAmount = numberValue(els.generationFixedAmount.value);
-  state.generationManualAmountsText = els.generationManualAmounts.value;
   if (state.generationMode === "single") {
     state.generationStubCount = 1;
   }
@@ -492,7 +491,10 @@ function handleGenerationInput() {
   clearFieldError("generation_stub_count");
   clearFieldError("generation_fixed_amount");
   clearFieldError("generation_manual_amounts");
-  renderForm();
+  const targetId = event?.target?.id || "";
+  if (targetId !== "generation_fixed_amount") {
+    renderForm();
+  }
   persistDraft();
   renderPreview();
 }
@@ -521,7 +523,7 @@ function handleInput(event) {
     clearFieldError("generation_manual_amounts");
     persistDraft();
     renderPreview();
-    renderForm();
+    scheduleAutoPreview();
     return;
   }
   const { section, index, prop, type } = target.dataset;
@@ -1836,11 +1838,12 @@ function renderManualAmountInputs() {
   }
   const amounts = manualAmountsForCount(state.generationStubCount);
   const entries = state.preview?.generation_plan?.entries || [];
+  const periodLabel = state.generationSequenceType === "weekly" ? "Week" : "Stub";
   els.generationManualAmountsList.innerHTML = amounts.map((amount, index) => {
     const entry = entries[index];
     const label = entry
-      ? `Stub ${entry.sequence_number} · ${entry.pay_period_start} to ${entry.pay_period_end} · pay ${entry.pay_date}`
-      : `Stub ${index + 1}`;
+      ? `${periodLabel} ${entry.sequence_number} · ${entry.pay_period_start} to ${entry.pay_period_end} · pay ${entry.pay_date}`
+      : `${periodLabel} ${index + 1}`;
     return `
       <div class="line-item">
         <div class="line-item-head">
@@ -1848,7 +1851,7 @@ function renderManualAmountInputs() {
         </div>
         <div class="line-item-grid is-compact">
           <label class="field field-inline">
-            <span>Gross amount</span>
+            <span>${escapeHtml(state.generationSequenceType === "weekly" ? "Weekly amount" : "Stub amount")}</span>
             <input
               type="number"
               min="0"
