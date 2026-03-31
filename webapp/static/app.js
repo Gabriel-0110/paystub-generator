@@ -156,6 +156,12 @@ function bind() {
   els.form.addEventListener("change", handleInput);
 
   document.addEventListener("click", async (event) => {
+    const proxyTrigger = event.target.closest("[data-proxy-click]");
+    if (proxyTrigger) {
+      document.getElementById(proxyTrigger.dataset.proxyClick)?.click();
+      return;
+    }
+
     const trigger = event.target.closest("[data-action]");
     if (!trigger) return;
     const { action, section, index } = trigger.dataset;
@@ -836,6 +842,12 @@ function renderForm() {
   els.generationStubCount.value = String(state.generationMode === "multiple" ? state.generationStubCount : 1);
   els.generationStubCount.disabled = state.generationMode === "single";
   els.generateButton.textContent = state.generationMode === "multiple" ? "Generate Batch ZIP" : "Generate PDF";
+  document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  document.getElementById("generation-frequency-field")?.toggleAttribute(
+    "hidden",
+    state.generationMode === "single" || state.generationSequenceType === "weekly"
+  );
+  document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", state.generationMode === "single");
   renderGenerationPlanSummary();
 
   Object.entries(SECTION_CONFIG).forEach(([section, fields]) => {
@@ -1329,7 +1341,8 @@ function renderPreview() {
   els.previewLines.innerHTML = [
     table("Earnings", ["Description", "Rate", "Hours", "Current", "YTD"], paystub.earnings.map((item) => [item.label, num(item.rate), num(item.hours), currency(item.current), currency(item.ytd)])),
     table("Taxes", ["Description", "Current", "YTD"], paystub.taxes.map((item) => [item.label, currency(item.current), currency(item.ytd)])),
-    table("Deductions", ["Description", "Current", "YTD"], [...paystub.deductions, ...paystub.adjustments].map((item) => [item.label, currency(item.current), currency(item.ytd)])),
+    table("Deductions", ["Description", "Current", "YTD"], paystub.deductions.map((item) => [item.label, currency(item.current), currency(item.ytd)])),
+    table("Adjustments", ["Description", "Current", "YTD"], paystub.adjustments.map((item) => [item.label, currency(item.current), currency(item.ytd)])),
     table("Benefits", ["Description", "Current", "YTD"], paystub.other_benefits.map((item) => [item.label, num(item.current), num(item.ytd)])),
   ].join("");
 

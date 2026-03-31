@@ -227,6 +227,14 @@ a {
   font-size: clamp(1.9rem, 3vw, 2.8rem);
 }
 
+.panel-intro,
+.step-copy {
+  margin: 10px 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .panel-actions,
 .inline-actions,
 .footer-actions {
@@ -284,7 +292,8 @@ a {
   border-color: rgba(157, 62, 45, 0.18);
 }
 
-.workflow-band {
+.quickstart-panel,
+.advanced-tools {
   margin-bottom: 18px;
   padding: 20px;
   border-radius: var(--radius-lg);
@@ -293,6 +302,54 @@ a {
     var(--panel-strong);
   border: 1px solid rgba(23, 22, 20, 0.08);
   box-shadow: var(--shadow-soft);
+}
+
+.quickstart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.quickstart-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+}
+
+.quickstart-card {
+  position: relative;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(23, 22, 20, 0.08);
+}
+
+.quickstart-card h4 {
+  margin: 0 0 8px;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+
+.quickstart-card p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #171614;
+  color: #f8f4ee;
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
 }
 
 .workflow-band-head,
@@ -505,6 +562,29 @@ a {
   border-radius: 16px;
   border: 1px solid rgba(23, 22, 20, 0.08);
   background: rgba(255, 255, 255, 0.62);
+}
+
+.advanced-tools {
+  padding-top: 0;
+}
+
+.advanced-tools > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 18px 20px;
+  margin: 0 -20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.advanced-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-tools-body {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
 }
 
 .profile-json-panel summary {
@@ -895,7 +975,8 @@ a {
 
 @media (max-width: 1080px) {
   .hero,
-  .workspace {
+  .workspace,
+  .quickstart-grid {
     grid-template-columns: 1fr;
   }
 
@@ -940,6 +1021,7 @@ a {
   .repeater-head,
   .form-footer,
   .utility-row,
+  .quickstart-head,
   .workflow-band-head,
   .workflow-card-head {
     flex-direction: column;

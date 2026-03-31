@@ -36,8 +36,12 @@
         <section class="editor-panel">
           <div class="panel-head">
             <div>
-              <p class="section-kicker">Draft Builder</p>
-              <h2>Paystub input</h2>
+              <p class="section-kicker">Guided Builder</p>
+              <h2>Create a paystub step by step</h2>
+              <p class="panel-intro">
+                Start from a sample, a saved assignment, or a blank draft. Then move through the form
+                in order and generate the final PDF from the review panel.
+              </p>
             </div>
             <div class="panel-actions">
               <label class="field compact-field">
@@ -45,7 +49,7 @@
                 <select id="template-select" aria-label="Paystub template"></select>
               </label>
               <button id="load-sample-button" type="button" class="ghost-button">Load sample</button>
-              <button id="reset-button" type="button" class="ghost-button">Reset draft</button>
+              <button id="reset-button" type="button" class="ghost-button">Start blank</button>
             </div>
           </div>
 
@@ -55,21 +59,32 @@
             <span id="preview-status" class="preview-status">Preview ready state unavailable.</span>
           </div>
 
-          <section class="workflow-band" aria-labelledby="workflow-tools-heading">
-            <div class="workflow-band-head">
+          <section class="quickstart-panel" aria-labelledby="quickstart-heading">
+            <div class="quickstart-head">
               <div>
-                <p class="section-kicker">Profile Workspace</p>
-                <h3 id="workflow-tools-heading">Load saved assignments or move profile bundles in and out</h3>
+                <p class="section-kicker">Quick Start</p>
+                <h3 id="quickstart-heading">Choose how you want to begin</h3>
               </div>
               <div id="profile-summary" class="profile-summary" aria-live="polite"></div>
             </div>
 
-            <div class="workflow-grid">
-              <section class="workflow-card" aria-labelledby="assignment-loader-heading">
+            <div class="quickstart-grid">
+              <section class="quickstart-card">
+                <span class="step-badge">1</span>
+                <h4>Pick a starting point</h4>
+                <p>Use the sample to learn the flow or start blank if you already know the data.</p>
+                <div class="inline-actions">
+                  <button type="button" class="secondary-button" id="quickstart-sample-button" data-proxy-click="load-sample-button">Use sample</button>
+                  <button type="button" class="ghost-button" id="quickstart-blank-button" data-proxy-click="reset-button">Start blank</button>
+                </div>
+              </section>
+
+              <section class="quickstart-card" aria-labelledby="assignment-loader-heading">
+                <span class="step-badge">2</span>
                 <div class="workflow-card-head">
                   <div>
-                    <h4 id="assignment-loader-heading">Assignment loader</h4>
-                    <p>Populate the editor from saved payroll profiles and a real pay period.</p>
+                    <h4 id="assignment-loader-heading">Or load a saved assignment</h4>
+                    <p>Populate the form from an existing payroll profile and pay period.</p>
                   </div>
                   <button id="load-assignment-button" type="button" class="secondary-button">Load assignment</button>
                 </div>
@@ -89,82 +104,15 @@
                 </div>
                 <p id="assignment-meta" class="workflow-meta">No saved assignments loaded yet.</p>
               </section>
-
-              <section class="workflow-card" aria-labelledby="profile-transfer-heading">
-                <div class="workflow-card-head">
-                  <div>
-                    <h4 id="profile-transfer-heading">Profile transfer</h4>
-                    <p>Export the repo profile store or import a bundle without leaving the app.</p>
-                  </div>
-                </div>
-                <div class="section-grid transfer-grid">
-                  <label class="field compact-field">
-                    <span>Export format</span>
-                    <select id="export-format" aria-label="Profile export format"></select>
-                  </label>
-                  <button id="export-profiles-button" type="button" class="ghost-button">Export profiles</button>
-                  <label class="field">
-                    <span>Import bundle</span>
-                    <input id="import-file" type="file" />
-                    <small class="field-hint">Use JSON, XLSX, or a ZIP file containing the CSV bundle.</small>
-                    <small id="import-file-status" class="field-hint">Choose a bundle to enable import.</small>
-                  </label>
-                  <div class="transfer-actions">
-                    <label class="field compact-field">
-                      <span>Import format</span>
-                      <select id="import-format" aria-label="Profile import format"></select>
-                    </label>
-                    <button id="import-profiles-button" type="button" class="ghost-button">Import profiles</button>
-                  </div>
-                </div>
-              </section>
-
-              <section class="workflow-card workflow-card-wide" aria-labelledby="profile-editor-heading">
-                <div class="workflow-card-head">
-                  <div>
-                    <h4 id="profile-editor-heading">Profile editor</h4>
-                    <p>Edit individual company, employee, tax, deduction, or assignment records in place.</p>
-                  </div>
-                  <div class="inline-actions">
-                    <button id="new-profile-button" type="button" class="ghost-button">New profile</button>
-                    <button id="load-profile-button" type="button" class="ghost-button">Load record</button>
-                    <button id="save-profile-button" type="button" class="secondary-button">Save profile</button>
-                  </div>
-                </div>
-                <div class="section-grid profile-editor-grid">
-                  <label class="field compact-field">
-                    <span>Profile type</span>
-                    <select id="profile-type-select" aria-label="Profile type"></select>
-                  </label>
-                  <label class="field">
-                    <span>Saved record</span>
-                    <select id="profile-id-select" aria-label="Saved profile record"></select>
-                  </label>
-                </div>
-                <p id="profile-editor-status" class="workflow-meta">Choose a profile type and record to edit.</p>
-                <div id="profile-form-shell" class="profile-form-shell"></div>
-                <details class="profile-json-panel">
-                  <summary>Advanced JSON</summary>
-                  <div class="profile-json-panel-body">
-                    <div class="inline-actions">
-                      <button id="apply-profile-json-button" type="button" class="ghost-button">Apply JSON</button>
-                    </div>
-                    <label class="field profile-editor-field">
-                      <span>Record JSON</span>
-                      <textarea id="profile-json-editor" rows="14" autocomplete="off" spellcheck="false"></textarea>
-                      <small class="field-hint">Use this for advanced edits. Apply JSON before saving if you changed it manually.</small>
-                    </label>
-                  </div>
-                </details>
-              </section>
             </div>
           </section>
 
           <form id="paystub-form" class="paystub-form" novalidate>
             <fieldset class="form-section generation-section">
-              <legend>Generation Plan</legend>
+              <legend>Step 1 · Output plan</legend>
+              <p class="step-copy">Choose whether you need one paystub or a guided multi-stub sequence.</p>
               <div class="generation-grid">
-                <label class="field compact-field">
+                <label id="generation-mode-field" class="field compact-field">
                   <span>Generation mode</span>
                   <select id="generation_mode" name="generation_mode" aria-label="Generation mode">
                     <option value="single">Single Paystub</option>
@@ -172,7 +120,7 @@
                   </select>
                   <small class="field-hint">Match the benchmark’s one-stub or add-dates workflow without changing your payroll data entry.</small>
                 </label>
-                <label class="field compact-field">
+                <label id="generation-sequence-field" class="field compact-field">
                   <span>Sequence type</span>
                   <select id="generation_sequence_type" name="generation_sequence_type" aria-label="Sequence type">
                     <option value="pay_frequency">Custom pay periods</option>
@@ -180,7 +128,7 @@
                   </select>
                   <small class="field-hint">Use payroll frequency for weekly, biweekly, semi-monthly, or monthly periods. Use weekly for one-week sequences.</small>
                 </label>
-                <label class="field compact-field">
+                <label id="generation-frequency-field" class="field compact-field">
                   <span>Pay frequency</span>
                   <select id="generation_pay_frequency" name="generation_pay_frequency" aria-label="Generation pay frequency">
                     <option value="weekly">Weekly</option>
@@ -190,7 +138,7 @@
                   </select>
                   <small class="field-hint">Controls how pay dates and pay periods roll forward when creating multiple stubs.</small>
                 </label>
-                <label class="field compact-field">
+                <label id="generation-stub-count-field" class="field compact-field">
                   <span>Number of stubs</span>
                   <input id="generation_stub_count" name="generation_stub_count" type="number" min="1" max="26" inputmode="numeric" />
                   <small class="field-hint">Generate a single pay period or a custom selected number of weeks or pay periods.</small>
@@ -201,7 +149,8 @@
             </fieldset>
 
             <fieldset class="form-section">
-              <legend>Company</legend>
+              <legend>Step 2 · Company and employee</legend>
+              <p class="step-copy">Enter who is paying and who is being paid.</p>
               <div class="section-grid two-up">
                 <label class="field">
                   <span>Company name</span>
@@ -222,20 +171,6 @@
                 <small class="field-hint">Use line breaks for multi-line mailing addresses.</small>
                 <small id="company_address-error" class="field-error" data-for="company_address" role="alert" aria-live="polite"></small>
               </label>
-              <div class="section-grid two-up">
-                <div class="benchmark-note">
-                  <strong>Benchmark note</strong>
-                  <p>The benchmark tools expose more advanced employer fields such as EIN, phone, logo, and advanced address handling. This app currently keeps the PDF model aligned to the core company identity fields already supported by the renderer.</p>
-                </div>
-                <div class="benchmark-note">
-                  <strong>Template note</strong>
-                  <p>Template switching remains available at the top of the editor so you can preview, review, and correct data before generating the final PDF or ZIP batch.</p>
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset class="form-section">
-              <legend>Employee</legend>
               <div class="section-grid three-up">
                 <label class="field">
                   <span>Employee name</span>
@@ -276,7 +211,8 @@
             </fieldset>
 
             <fieldset class="form-section">
-              <legend>Pay Schedule</legend>
+              <legend>Step 3 · Pay schedule</legend>
+              <p class="step-copy">Set the pay period and the date the employee is paid.</p>
               <div class="section-grid three-up">
                 <label class="field">
                   <span>Pay period start</span>
@@ -299,8 +235,8 @@
             <section class="repeater-section">
               <div class="repeater-head">
                 <div>
-                  <h3>Earnings</h3>
-                  <p>Define regular pay plus benchmark-style extra earnings such as overtime, bonus, reimbursement, or commission lines.</p>
+                  <h3>Step 4 · Earnings</h3>
+                  <p>Add the earnings lines that make up gross pay for this stub.</p>
                 </div>
                 <button type="button" class="ghost-button" data-action="add-row" data-section="earnings">Add earning</button>
               </div>
@@ -311,8 +247,8 @@
             <section class="repeater-section">
               <div class="repeater-head">
                 <div>
-                  <h3>Taxes</h3>
-                  <p>Enter current and year-to-date withholding lines.</p>
+                  <h3>Step 5 · Taxes</h3>
+                  <p>List withholding lines for the current period and year-to-date totals.</p>
                 </div>
                 <button type="button" class="ghost-button" data-action="add-row" data-section="taxes">Add tax</button>
               </div>
@@ -322,23 +258,30 @@
             <section class="repeater-section">
               <div class="repeater-head">
                 <div>
-                  <h3>Taxes, Deductions, and Additions</h3>
-                  <p>Use deductions for employee-paid items and adjustments for reimbursements, additions, or corrections that should appear alongside YTD values.</p>
+                  <h3>Step 6 · Deductions</h3>
+                  <p>Use deductions for employee-paid items such as insurance, retirement, or other withholdings.</p>
                 </div>
-                <div class="inline-actions">
-                  <button type="button" class="ghost-button" data-action="add-row" data-section="deductions">Add deduction</button>
-                  <button type="button" class="ghost-button" data-action="add-row" data-section="adjustments">Add adjustment</button>
-                </div>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="deductions">Add deduction</button>
               </div>
               <div id="deductions-list" class="repeater-list" data-empty-label="No deductions added yet."></div>
+            </section>
+
+            <section class="repeater-section">
+              <div class="repeater-head">
+                <div>
+                  <h3>Step 7 · Adjustments</h3>
+                  <p>Add reimbursements, employer additions, or corrections that should appear separately from deductions.</p>
+                </div>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="adjustments">Add adjustment</button>
+              </div>
               <div id="adjustments-list" class="repeater-list secondary-list" data-empty-label="No adjustments added."></div>
             </section>
 
             <section class="repeater-section">
               <div class="repeater-head">
                 <div>
-                  <h3>Benefits, Accruals, and Time Off</h3>
-                  <p>Record employer-paid benefits, PTO balances, sick/vacation accruals, or other informational balances that should carry YTD values.</p>
+                  <h3>Step 8 · Benefits and balances</h3>
+                  <p>Record employer-paid benefits, PTO balances, sick time, or other informational year-to-date balances.</p>
                 </div>
                 <button type="button" class="ghost-button" data-action="add-row" data-section="other_benefits">Add benefit</button>
               </div>
@@ -346,7 +289,8 @@
             </section>
 
             <fieldset class="form-section">
-              <legend>Notes</legend>
+              <legend>Step 9 · Notes</legend>
+              <p class="step-copy">Add any messages or footnotes that should appear on the paystub.</p>
               <div class="section-grid two-up">
                 <label class="field">
                   <span>Important notes</span>
@@ -363,7 +307,7 @@
 
             <div class="form-footer">
               <div class="footer-copy">
-                <p>Preview validates and normalizes totals. Generate produces a PDF in the local output folder.</p>
+                <p>First refresh the preview to review totals. Then generate the final PDF or ZIP from the current draft.</p>
               </div>
               <div class="footer-actions">
                 <button id="preview-button" type="submit" class="primary-button">Refresh preview</button>
@@ -371,6 +315,79 @@
               </div>
             </div>
           </form>
+
+          <details class="advanced-tools" aria-labelledby="advanced-tools-heading">
+            <summary id="advanced-tools-heading">Advanced profile tools</summary>
+            <div class="advanced-tools-body">
+              <section class="workflow-card" aria-labelledby="profile-transfer-heading">
+                <div class="workflow-card-head">
+                  <div>
+                    <h4 id="profile-transfer-heading">Import or export saved profiles</h4>
+                    <p>Use this only when you need to move profile data in or out of the app.</p>
+                  </div>
+                </div>
+                <div class="section-grid transfer-grid">
+                  <label class="field compact-field">
+                    <span>Export format</span>
+                    <select id="export-format" aria-label="Profile export format"></select>
+                  </label>
+                  <button id="export-profiles-button" type="button" class="ghost-button">Export profiles</button>
+                  <label class="field">
+                    <span>Import bundle</span>
+                    <input id="import-file" type="file" />
+                    <small class="field-hint">Use JSON, XLSX, or a ZIP file containing the CSV bundle.</small>
+                    <small id="import-file-status" class="field-hint">Choose a bundle to enable import.</small>
+                  </label>
+                  <div class="transfer-actions">
+                    <label class="field compact-field">
+                      <span>Import format</span>
+                      <select id="import-format" aria-label="Profile import format"></select>
+                    </label>
+                    <button id="import-profiles-button" type="button" class="ghost-button">Import profiles</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="workflow-card" aria-labelledby="profile-editor-heading">
+                <div class="workflow-card-head">
+                  <div>
+                    <h4 id="profile-editor-heading">Edit saved profiles</h4>
+                    <p>Manage company, employee, tax, deduction, or assignment records without affecting the guided paystub flow above.</p>
+                  </div>
+                  <div class="inline-actions">
+                    <button id="new-profile-button" type="button" class="ghost-button">New profile</button>
+                    <button id="load-profile-button" type="button" class="ghost-button">Load record</button>
+                    <button id="save-profile-button" type="button" class="secondary-button">Save profile</button>
+                  </div>
+                </div>
+                <div class="section-grid profile-editor-grid">
+                  <label class="field compact-field">
+                    <span>Profile type</span>
+                    <select id="profile-type-select" aria-label="Profile type"></select>
+                  </label>
+                  <label class="field">
+                    <span>Saved record</span>
+                    <select id="profile-id-select" aria-label="Saved profile record"></select>
+                  </label>
+                </div>
+                <p id="profile-editor-status" class="workflow-meta">Choose a profile type and record to edit.</p>
+                <div id="profile-form-shell" class="profile-form-shell"></div>
+                <details class="profile-json-panel">
+                  <summary>Advanced JSON</summary>
+                  <div class="profile-json-panel-body">
+                    <div class="inline-actions">
+                      <button id="apply-profile-json-button" type="button" class="ghost-button">Apply JSON</button>
+                    </div>
+                    <label class="field profile-editor-field">
+                      <span>Record JSON</span>
+                      <textarea id="profile-json-editor" rows="14" autocomplete="off" spellcheck="false"></textarea>
+                      <small class="field-hint">Use this only for advanced edits. Apply JSON before saving if you changed it manually.</small>
+                    </label>
+                  </div>
+                </details>
+              </section>
+            </div>
+          </details>
         </section>
 
         <aside class="preview-panel">
