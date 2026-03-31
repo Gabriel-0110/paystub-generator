@@ -1179,9 +1179,13 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_address_block(c, left_text_x, top_y - 47, _format_address(paystub.company_address), size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
 
     draw_text(c, right_block_x, top_y - 20, "Earnings Statement", size=13, bold=True, color=TEXT)
-    # Company logo in top-right corner of earnings statement
+    # ADP logo always in top-right corner of earnings statement
     logo_es_size = 28
-    draw_logo_or_badge(c, right_block_x + right_block_w - logo_es_size, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo=paystub.company_logo or "")
+    adp_logo_x = right_block_x + right_block_w - logo_es_size
+    draw_logo_or_badge(c, adp_logo_x, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo="")
+    # Company logo next to ADP when provided
+    if paystub.company_logo and paystub.company_logo.strip():
+        draw_logo_or_badge(c, adp_logo_x - logo_es_size - 4, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo=paystub.company_logo)
     draw_text(c, right_block_x, top_y - 39, "Period ending:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 39, paystub.pay_period_end, size=6.6, color=TEXT)
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
@@ -1333,11 +1337,17 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     logo_sz = 20
     logo_x = ck_x + side_strip + 8
     logo_y_pos = ck_y + ck_h - strip_h + (strip_h - logo_sz) // 2
-    draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text="PG", custom_logo=paystub.company_logo or "")
+    # Always draw ADP logo on the check
+    draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text=_company_code(paystub), custom_logo="")
+    text_offset_x = logo_x + logo_sz + 18
+    # Company logo next to ADP when provided
+    if paystub.company_logo and paystub.company_logo.strip():
+        draw_logo_or_badge(c, logo_x + 40, logo_y_pos, 36, logo_sz, text=_company_code(paystub), custom_logo=paystub.company_logo)
+        text_offset_x = logo_x + logo_sz + 56
 
     left_panel_w = div_x - (ck_x + side_strip + 18)
-    draw_fit_text(c, logo_x + logo_sz + 18, ck_y + ck_h - 10, left_panel_w - 52, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
-    draw_address_block(c, logo_x + logo_sz + 18, ck_y + ck_h - 20, _format_address(paystub.company_address), size=6, color=TEXT, width=left_panel_w - 52, max_lines=2)
+    draw_fit_text(c, text_offset_x, ck_y + ck_h - 10, left_panel_w - 52, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
+    draw_address_block(c, text_offset_x, ck_y + ck_h - 20, _format_address(paystub.company_address), size=6, color=TEXT, width=left_panel_w - 52, max_lines=2)
 
     draw_text(c, div_x + 8, ck_y + ck_h - 9, "Payroll check number:", size=6, bold=True, color=TEXT)
     draw_text(c, div_x + 92, ck_y + ck_h - 9, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
@@ -1347,20 +1357,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, div_x + 92, ck_y + ck_h - 29, _masked_ssn(paystub.social_security_number), size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 39, "Net pay:", size=6, bold=True, color=TEXT)
     draw_text(c, div_x + 92, ck_y + ck_h - 39, money(paystub.net_pay_current), size=6, bold=True, color=INK)
-    if paystub.bank_name:
-        draw_text(c, div_x + 8, ck_y + ck_h - 49, "Bank:", size=6, bold=True, color=TEXT)
-        draw_fit_text(c, div_x + 92, ck_y + ck_h - 49, 120, paystub.bank_name, size=6, min_size=5.2, color=TEXT)
-    if paystub.deposit_account_type or paystub.account_number:
-        draw_text(c, div_x + 8, ck_y + ck_h - 59, "Deposit:", size=6, bold=True, color=TEXT)
-        deposit_bits = []
-        if paystub.deposit_account_type:
-            deposit_bits.append(str(paystub.deposit_account_type).title())
-        if paystub.account_number:
-            deposit_bits.append(_masked_account(paystub.account_number))
-        draw_fit_text(c, div_x + 92, ck_y + ck_h - 59, 120, " ".join(deposit_bits), size=6, min_size=5.2, color=TEXT)
-    if paystub.routing_number:
-        draw_text(c, div_x + 8, ck_y + ck_h - 69, "Routing:", size=6, bold=True, color=TEXT)
-        draw_text(c, div_x + 92, ck_y + ck_h - 69, str(paystub.routing_number), size=6, color=TEXT)
 
     body_top = ck_y + ck_h - strip_h
 
@@ -1392,11 +1388,33 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_rule(c, sig_x1, sig_y, sig_x2, sig_y, color=BLACK, lw=0.7)
 
     c.saveState()
-    c.saveState()
     c.setFont("Times-Italic", 20)
     c.setFillColor(TEXT)
     c.drawString(sig_x1 + 10, sig_y + 4, _signature_initials(paystub))
     c.restoreState()
+
+    # Bank info — bottom-left of check
+    bank_y = ck_y + 16
+    bank_x = payee_x
+    bank_lines = []
+    if paystub.bank_name:
+        bank_lines.append(paystub.bank_name.upper())
+    addr_parts = []
+    if paystub.deposit_account_type or paystub.account_number:
+        deposit_bits = []
+        if paystub.deposit_account_type:
+            deposit_bits.append(str(paystub.deposit_account_type).title())
+        if paystub.account_number:
+            deposit_bits.append(_masked_account(paystub.account_number))
+        addr_parts.append(" ".join(deposit_bits))
+    if paystub.routing_number:
+        addr_parts.append(f"Routing: {paystub.routing_number}")
+    if addr_parts:
+        bank_lines.extend(addr_parts)
+    if not bank_lines:
+        bank_lines = ["BANK NAME", "STREET ADDRESS", "CITY STATE ZIP"]
+    for i, bline in enumerate(bank_lines[:3]):
+        draw_text(c, bank_x, bank_y - (i * 8), bline, size=5.5, color=TEXT_MUTED)
 
     draw_text(c, sig_x1 + 8, sig_y - 7, "AUTHORIZED SIGNATURE", size=5, color=TEXT)
     company_address_lines = _address_lines(paystub.company_address, max_lines=2)

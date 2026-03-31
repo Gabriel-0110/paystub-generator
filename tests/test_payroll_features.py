@@ -498,6 +498,10 @@ class TemplateRendererTests(unittest.TestCase):
                 "other_benefits": [],
                 "important_notes": [],
                 "footnotes": [],
+                "bank_name": "JP Morgan Chase Bank, N.A.",
+                "deposit_account_type": "Checking",
+                "account_number": "XXXX6986",
+                "routing_number": "021000021",
             }
         )
 
