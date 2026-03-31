@@ -1949,14 +1949,8 @@ function syncCompensationInputs() {
     field.value = String(state.paystub?.[name] ?? 0);
   });
 
-  const weeklyHoursField = document.getElementById("weekly_hours");
   const hourlyRateField = document.getElementById("hourly_rate");
   const regularHoursField = document.getElementById("regular_hours");
-
-  if (weeklyHoursField instanceof HTMLInputElement) {
-    weeklyHoursField.readOnly = !salaryDriven;
-    weeklyHoursField.setAttribute("aria-readonly", String(!salaryDriven));
-  }
 
   if (hourlyRateField instanceof HTMLInputElement) {
     hourlyRateField.readOnly = salaryDriven;
