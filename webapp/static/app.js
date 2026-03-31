@@ -1959,10 +1959,14 @@ function syncDerivedCompensationFields(targetPaystub = state.paystub, changedFie
 
   if (!shouldAutoCalculateHourlyRate) return;
 
-  if (changedField === "salary_period_amount" && salaryPeriodAmount > 0) {
-    targetPaystub.annual_salary = roundMoney(salaryPeriodAmount * periodsPerYear);
-  } else if (changedField === "annual_salary" && annualSalary > 0) {
-    targetPaystub.salary_period_amount = roundMoney(annualSalary / periodsPerYear);
+  if (changedField === "salary_period_amount") {
+    if (salaryPeriodAmount > 0) {
+      targetPaystub.annual_salary = roundMoney(salaryPeriodAmount * periodsPerYear);
+    }
+  } else if (changedField === "annual_salary") {
+    if (annualSalary > 0) {
+      targetPaystub.salary_period_amount = roundMoney(annualSalary / periodsPerYear);
+    }
   } else if (salaryPeriodAmount > 0 && annualSalary <= 0) {
     targetPaystub.annual_salary = roundMoney(salaryPeriodAmount * periodsPerYear);
   } else if (annualSalary > 0 && salaryPeriodAmount <= 0) {
