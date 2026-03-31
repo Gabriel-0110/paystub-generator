@@ -271,16 +271,17 @@ class EmployeePayConfig:
     employee_id:            str
     employee_name:          str
     employee_address:       str
+
+    # Employer
+    company_name:    str
+    company_address: str
+
+    social_security_number: str = ""
     bank_name:              str = ""
     deposit_account_type:   str = ""
     routing_number:         str = ""
     account_number:         str = ""
     direct_deposit_amount:  float = 0.0
-    social_security_number: str = ""
-
-    # Employer
-    company_name:    str
-    company_address: str
 
     # Pay setup
     filing_status:  FilingStatus  = FilingStatus.SINGLE
