@@ -1247,7 +1247,7 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         right_w,
         "Other Benefits and Information",
         ("Description", "this period", "total to date"),
-        benefits_rows if benefits_rows else [("No employer-paid items", "", "")],
+        benefits_rows,
         column_widths=(3.2, 1.35, 1.35),
         value_size=6.45,
         header_size=5.5,
@@ -1255,6 +1255,9 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         zebra_fill=None,
         placeholder=None,
     )
+    tear_y = 184
+    notes_top = benefits_bottom - 8
+    notes_h = max(86, notes_top - (tear_y + 8))
     draw_form_note_panel(
         c,
         right_x,
@@ -1267,11 +1270,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         stroke=GRID_STRONG,
         empty_message=None,
     )
-
-    tear_y = 184
-    notes_top = benefits_bottom - 8
-    notes_h = max(86, notes_top - (tear_y + 8))
-    draw_form_note_panel(c, right_x, notes_top, right_w, notes_h, "Important Notes", paystub.important_notes or [], fill=WHITE, stroke=GRID_STRONG)
 
     c.setDash(3, 3)
     draw_rule(c, margin, tear_y, PAGE_WIDTH - margin, tear_y, color=LINE, lw=0.6)
