@@ -1179,6 +1179,9 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_address_block(c, left_text_x, top_y - 47, _format_address(paystub.company_address), size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
 
     draw_text(c, right_block_x, top_y - 20, "Earnings Statement", size=13, bold=True, color=TEXT)
+    # Company logo in top-right corner of earnings statement
+    logo_es_size = 28
+    draw_logo_or_badge(c, right_block_x + right_block_w - logo_es_size, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo=paystub.company_logo or "")
     draw_text(c, right_block_x, top_y - 39, "Period ending:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 39, paystub.pay_period_end, size=6.6, color=TEXT)
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
@@ -1268,7 +1271,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         header_size=5.5,
         title_fill=SURFACE_ALT,
         zebra_fill=None,
-        placeholder=None,
     )
     tear_y = 184
     notes_top = benefits_bottom - 8
@@ -1283,7 +1285,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         paystub.important_notes or [],
         fill=WHITE,
         stroke=GRID_STRONG,
-        empty_message=None,
     )
 
     c.setDash(3, 3)

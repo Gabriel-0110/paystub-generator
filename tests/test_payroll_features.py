@@ -530,7 +530,6 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertIn("OTHER BENEFITS AND INFORMATION", text)
         self.assertIn("IMPORTANT NOTES", text)
         self.assertNotIn("No employer-paid items", text)
-        self.assertNotIn("No additional notes.", text)
 
 
 class ProfileStoreTests(unittest.TestCase):
