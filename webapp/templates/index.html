@@ -363,31 +363,31 @@
                 <label class="field">
                   <span>Salary this pay period</span>
                   <input id="salary_period_amount" name="salary_period_amount" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="salary_period_amount-error" />
-                  <small class="field-hint">Use this for the weekly or per-paycheck salary amount. Annual salary updates automatically from it.</small>
+                  <small class="field-hint compact-hint">Enter the weekly salary or paycheck amount. Annual salary updates automatically.</small>
                   <small id="salary_period_amount-error" class="field-error" data-for="salary_period_amount" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Annual salary</span>
                   <input id="annual_salary" name="annual_salary" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="annual_salary-error" />
-                  <small class="field-hint">You can enter annual salary here, or fill salary this pay period and let this field update automatically.</small>
+                  <small class="field-hint compact-hint">You can enter the annual salary here, or let it fill automatically from the pay-period salary.</small>
                   <small id="annual_salary-error" class="field-error" data-for="annual_salary" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Weekly hours worked</span>
                   <input id="weekly_hours" name="weekly_hours" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="weekly_hours-error" />
-                  <small class="field-hint">Used with annual salary to calculate the hourly rate and per-period hours automatically.</small>
+                  <small class="field-hint compact-hint">Used to calculate the salary hourly rate and regular hours automatically.</small>
                   <small id="weekly_hours-error" class="field-error" data-for="weekly_hours" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Hourly rate</span>
                   <input id="hourly_rate" name="hourly_rate" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="hourly_rate-error" />
-                  <small class="field-hint">For salary, this is filled automatically from annual salary and weekly hours.</small>
+                  <small class="field-hint compact-hint">For salary, this field is calculated automatically from annual salary and weekly hours.</small>
                   <small id="hourly_rate-error" class="field-error" data-for="hourly_rate" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Regular hours</span>
                   <input id="regular_hours" name="regular_hours" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="regular_hours-error" />
-                  <small class="field-hint">For salary, this is calculated automatically for the selected pay frequency.</small>
+                  <small class="field-hint compact-hint">For salary, this field is calculated automatically for the selected pay frequency.</small>
                   <small id="regular_hours-error" class="field-error" data-for="regular_hours" role="alert" aria-live="polite"></small>
                 </label>
               </div>

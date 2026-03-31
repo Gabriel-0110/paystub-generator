@@ -728,6 +728,13 @@ a {
   font-size: 0.83rem;
 }
 
+.compact-hint {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  max-width: 28ch;
+}
+
 .field-error {
   color: var(--danger);
 }

@@ -38,6 +38,15 @@ const PROFILE_TYPE_LABELS = {
 const FILING_STATUS_OPTIONS = ["Single", "Married", "Head of Household"];
 const FREQUENCY_OPTIONS = ["weekly", "biweekly", "semimonthly", "monthly"];
 const COMPENSATION_OPTIONS = ["hourly", "salary"];
+const COMPENSATION_SYNC_FIELDS = new Set([
+  "compensation_type",
+  "pay_frequency",
+  "salary_period_amount",
+  "annual_salary",
+  "weekly_hours",
+  "hourly_rate",
+  "regular_hours",
+]);
 const GUIDED_DRAFT_FIELDS = new Set([
   "taxable_marital_status",
   "work_state",
@@ -557,6 +566,9 @@ function handleInput(event) {
     clearFieldError(target.name);
   }
   syncDerivedCompensationFields(state.paystub, target.name || "");
+  if (COMPENSATION_SYNC_FIELDS.has(target.name || "")) {
+    syncCompensationInputs();
+  }
   state.previewStale = Boolean(state.preview);
   persistDraft();
   renderPreview();
@@ -975,13 +987,7 @@ function renderForm() {
     const field = document.getElementById(name);
     if (field) field.value = String(state.paystub[name] ?? 0);
   });
-  const salaryDriven = state.paystub.compensation_type === "salary";
-  const weeklyHoursField = document.getElementById("weekly_hours");
-  const hourlyRateField = document.getElementById("hourly_rate");
-  const regularHoursField = document.getElementById("regular_hours");
-  if (weeklyHoursField) weeklyHoursField.readOnly = !salaryDriven;
-  if (hourlyRateField) hourlyRateField.readOnly = salaryDriven;
-  if (regularHoursField) regularHoursField.readOnly = salaryDriven;
+  syncCompensationInputs();
   document.getElementById("important_notes").value = (state.paystub.important_notes || []).join("\n");
   document.getElementById("footnotes").value = (state.paystub.footnotes || []).join("\n");
   els.templateSelect.value = state.template;
@@ -1931,6 +1937,36 @@ function syncDerivedCompensationFields(targetPaystub = state.paystub, changedFie
   }
   targetPaystub.hourly_rate = roundMoney(resolvedAnnualSalary / (weeklyHours * 52));
   targetPaystub.regular_hours = roundMoney((weeklyHours * 52) / periodsPerYear);
+}
+
+function syncCompensationInputs() {
+  const salaryDriven = state.paystub?.compensation_type === "salary";
+  const fieldNames = ["salary_period_amount", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours"];
+
+  fieldNames.forEach((name) => {
+    const field = document.getElementById(name);
+    if (!(field instanceof HTMLInputElement)) return;
+    field.value = String(state.paystub?.[name] ?? 0);
+  });
+
+  const weeklyHoursField = document.getElementById("weekly_hours");
+  const hourlyRateField = document.getElementById("hourly_rate");
+  const regularHoursField = document.getElementById("regular_hours");
+
+  if (weeklyHoursField instanceof HTMLInputElement) {
+    weeklyHoursField.readOnly = !salaryDriven;
+    weeklyHoursField.setAttribute("aria-readonly", String(!salaryDriven));
+  }
+
+  if (hourlyRateField instanceof HTMLInputElement) {
+    hourlyRateField.readOnly = salaryDriven;
+    hourlyRateField.setAttribute("aria-readonly", String(salaryDriven));
+  }
+
+  if (regularHoursField instanceof HTMLInputElement) {
+    regularHoursField.readOnly = salaryDriven;
+    regularHoursField.setAttribute("aria-readonly", String(salaryDriven));
+  }
 }
 
 function scheduleAutoPreview() {
