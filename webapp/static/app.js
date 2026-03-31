@@ -163,6 +163,10 @@ function cache() {
   els.saveProfileButton = document.getElementById("save-profile-button");
   els.saveCompanyProfileButton = document.getElementById("save-company-profile-button");
   els.saveEmployeeProfileButton = document.getElementById("save-employee-profile-button");
+  els.guidedCompanyProfile = document.getElementById("guided-company-profile");
+  els.guidedEmployeeProfile = document.getElementById("guided-employee-profile");
+  els.loadCompanyProfileButton = document.getElementById("load-company-profile-button");
+  els.loadEmployeeProfileButton = document.getElementById("load-employee-profile-button");
   els.profileEditorStatus = document.getElementById("profile-editor-status");
   els.profileFormShell = document.getElementById("profile-form-shell");
   els.profileJsonEditor = document.getElementById("profile-json-editor");
@@ -272,6 +276,14 @@ function bind() {
 
   els.saveEmployeeProfileButton?.addEventListener("click", async () => {
     await saveCurrentEmployeeProfile();
+  });
+
+  els.loadCompanyProfileButton?.addEventListener("click", async () => {
+    await loadGuidedCompanyProfile();
+  });
+
+  els.loadEmployeeProfileButton?.addEventListener("click", async () => {
+    await loadGuidedEmployeeProfile();
   });
 
   els.profileJsonEditor.addEventListener("input", () => {
@@ -521,6 +533,10 @@ function renderProfileControls() {
   els.assignmentSelect.innerHTML = state.assignmentOptions.length
     ? state.assignmentOptions.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("")
     : `<option value="">No saved assignments</option>`;
+  els.guidedCompanyProfile.innerHTML = buildProfileOptions(state.profileCatalog.company || [], "No saved companies");
+  els.guidedEmployeeProfile.innerHTML = buildProfileOptions(state.profileCatalog.employee || [], "No saved employees");
+  els.loadCompanyProfileButton.disabled = !(state.profileCatalog.company || []).length;
+  els.loadEmployeeProfileButton.disabled = !(state.profileCatalog.employee || []).length;
 
   if (!state.assignmentOptions.length) {
     state.assignmentId = "";
@@ -926,9 +942,6 @@ function renderForm() {
   );
   document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-anchor-field")?.toggleAttribute("hidden", state.generationMode === "single");
-  document.getElementById("annual_salary")?.toggleAttribute("disabled", state.paystub.compensation_type !== "salary");
-  document.getElementById("hourly_rate")?.toggleAttribute("disabled", state.paystub.compensation_type === "salary");
-  document.getElementById("regular_hours")?.toggleAttribute("disabled", state.paystub.compensation_type === "salary");
   renderGenerationPlanSummary();
 
   renderComputedTaxLines();
@@ -1195,6 +1208,7 @@ async function generatePdf() {
     renderForm();
     renderPreview();
     persistDraft();
+    triggerDownload(response.download_url, response.filename);
     if (response.mode === "multiple") {
       showMessage(downloadMessage("Batch generated successfully.", response.download_url, "Download the ZIP"), "success", {
         allowHtml: true,
@@ -1219,12 +1233,7 @@ async function exportProfiles() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_format: els.exportFormat.value }),
     });
-    const link = document.createElement("a");
-    link.href = response.download_url;
-    link.download = response.filename;
-    document.body.append(link);
-    link.click();
-    link.remove();
+    triggerDownload(response.download_url, response.filename);
     showMessage(
       downloadMessage("Profile export ready.", response.download_url, `Download ${response.filename}`),
       "success",
@@ -1572,6 +1581,8 @@ function setWorking(mode) {
     els.saveProfileButton,
     els.saveCompanyProfileButton,
     els.saveEmployeeProfileButton,
+    els.loadCompanyProfileButton,
+    els.loadEmployeeProfileButton,
     els.applyProfileJsonButton,
   ];
   allButtons.forEach((button) => {
@@ -1622,6 +1633,8 @@ function clearWorking() {
     els.saveProfileButton,
     els.saveCompanyProfileButton,
     els.saveEmployeeProfileButton,
+    els.loadCompanyProfileButton,
+    els.loadEmployeeProfileButton,
     els.applyProfileJsonButton,
   ].forEach((button) => {
     if (button) button.disabled = false;
@@ -1743,6 +1756,96 @@ function renderComputedTaxLines() {
       `
     )
     .join("");
+}
+
+function buildProfileOptions(ids, emptyLabel) {
+  if (!ids.length) return `<option value="">${escapeHtml(emptyLabel)}</option>`;
+  return ids.map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join("");
+}
+
+async function loadGuidedCompanyProfile() {
+  const profileId = els.guidedCompanyProfile.value;
+  if (!profileId) {
+    showMessage("Choose a saved company profile first.", "error");
+    return;
+  }
+  setWorking("profile");
+  try {
+    const response = await api(`/api/profiles/company/${encodeURIComponent(profileId)}`);
+    const record = response.record || {};
+    state.paystub.company_name = record.company_name || "";
+    state.paystub.company_address = record.company_address || "";
+    if (!String(state.paystub.payroll_check_number || "").trim()) {
+      state.paystub.payroll_check_number = record.default_payroll_check_number || "";
+    }
+    renderForm();
+    persistDraft();
+    showMessage(`Loaded company profile ${escapeHtml(profileId)} into the builder.`, "success");
+  } catch (error) {
+    showMessage(formatError(error), "error");
+  } finally {
+    clearWorking();
+  }
+}
+
+async function loadGuidedEmployeeProfile() {
+  const profileId = els.guidedEmployeeProfile.value;
+  if (!profileId) {
+    showMessage("Choose a saved employee profile first.", "error");
+    return;
+  }
+  setWorking("profile");
+  try {
+    const response = await api(`/api/profiles/employee/${encodeURIComponent(profileId)}`);
+    const record = response.record || {};
+    const earnings = record.earnings || [];
+    const firstLine = earnings[0] || null;
+    const payPeriodsPerYear = {
+      weekly: 52,
+      biweekly: 26,
+      semimonthly: 24,
+      monthly: 12,
+    }[state.paystub.pay_frequency || "biweekly"] || 26;
+    state.paystub.employee_name = record.employee_name || "";
+    state.paystub.employee_id = record.employee_id || "";
+    state.paystub.employee_address = record.employee_address || "";
+    state.paystub.social_security_number = record.social_security_number || "";
+    state.paystub.other_benefits = [];
+    state.paystub.important_notes = record.important_notes || [];
+    state.paystub.draft_mode = true;
+    if (firstLine && Number(firstLine.flat_amount || 0) > 0) {
+      state.paystub.compensation_type = "salary";
+      state.paystub.primary_earning_label = firstLine.label || "Regular";
+      state.paystub.annual_salary = roundMoney(Number(firstLine.flat_amount || 0) * payPeriodsPerYear);
+      state.paystub.hourly_rate = 0;
+      state.paystub.regular_hours = 0;
+      state.paystub.source_earnings = earnings.slice(1).map((item) => ({
+        label: item.label || "Overtime",
+        rate: numberValue(item.rate),
+        hours: numberValue(item.hours),
+        amount: numberValue(item.flat_amount),
+      }));
+    } else {
+      state.paystub.compensation_type = "hourly";
+      state.paystub.primary_earning_label = firstLine?.label || "Regular";
+      state.paystub.hourly_rate = numberValue(firstLine?.rate);
+      state.paystub.regular_hours = numberValue(firstLine?.hours);
+      state.paystub.annual_salary = 0;
+      state.paystub.source_earnings = earnings.slice(firstLine ? 1 : 0).map((item) => ({
+        label: item.label || "Overtime",
+        rate: numberValue(item.rate),
+        hours: numberValue(item.hours),
+        amount: numberValue(item.flat_amount),
+      }));
+    }
+    renderForm();
+    persistDraft();
+    showMessage(`Loaded employee profile ${escapeHtml(profileId)} into the builder.`, "success");
+  } catch (error) {
+    showMessage(formatError(error), "error");
+  } finally {
+    clearWorking();
+  }
 }
 
 function slugify(value, fallback) {
@@ -1868,6 +1971,10 @@ function numberValue(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function roundMoney(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
 function clampYear(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return new Date().getFullYear();
@@ -1888,6 +1995,15 @@ function formatError(error) {
 
 function downloadMessage(prefix, downloadUrl, linkLabel) {
   return `${escapeHtml(prefix)} <a href="${escapeAttribute(downloadUrl)}">${escapeHtml(linkLabel)}</a>.`;
+}
+
+function triggerDownload(downloadUrl, filename) {
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  if (filename) link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function escapeHtml(value) {

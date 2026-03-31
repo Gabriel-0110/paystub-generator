@@ -428,6 +428,12 @@ a {
   align-items: end;
 }
 
+.quick-load-grid {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
 .generation-grid {
   display: grid;
   gap: 16px;
@@ -1019,6 +1025,7 @@ a {
 
   .section-grid.two-up,
   .section-grid.three-up,
+  .quick-load-grid,
   .generation-grid,
   .assignment-grid,
   .transfer-grid,
