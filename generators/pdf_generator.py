@@ -63,20 +63,20 @@ ADP_LOGO_READER: ImageReader | None = None
 
 # -- Number formatting helpers -------------------------------------------------
 
-def num(value: float) -> str:
-    return f"{value:,.2f}"
+def num(value: float | None) -> str:
+    return f"{(value or 0):,.2f}"
 
 
-def money(value: float) -> str:
-    return f"${value:,.2f}"
+def money(value: float | None) -> str:
+    return f"${(value or 0):,.2f}"
 
 
-def money_display(value: float) -> str:
-    return f"$ {value:,.2f}"
+def money_display(value: float | None) -> str:
+    return f"$ {(value or 0):,.2f}"
 
 
-def neg(value: float) -> str:
-    if value == 0:
+def neg(value: float | None) -> str:
+    if not value:
         return ""
     return f"-{value:,.2f}"
 
@@ -1393,12 +1393,26 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, ck_x + 118, ck_y + 6, f"\u2448{check_num}\u2448  :{micr_seed[:9]}:  {micr_seed[3:12]}\u2448", size=9, color=TEXT)
 
 
+def _ensure_totals(paystub: Paystub) -> Paystub:
+    """Guarantee that all optional money totals are a float so formatters never receive None."""
+    fields = (
+        "gross_pay_current", "gross_pay_ytd",
+        "total_taxes_current", "total_taxes_ytd",
+        "total_deductions_current", "total_deductions_ytd",
+        "net_pay_current", "net_pay_ytd",
+    )
+    for field in fields:
+        if getattr(paystub, field) is None:
+            object.__setattr__(paystub, field, 0.0)
+    return paystub
+
+
 def generate_paystub_pdf(
     data: dict,
     output_dir: str = "output",
     template: PaystubTemplate | str = PaystubTemplate.DETACHED_CHECK,
 ) -> str:
-    paystub = Paystub(**data)
+    paystub = _ensure_totals(Paystub(**data))
     resolved_template = _coerce_template(template)
 
     output_dir_path = Path(output_dir)
