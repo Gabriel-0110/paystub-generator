@@ -73,6 +73,9 @@ const state = {
   generationPayFrequency: "biweekly",
   generationStubCount: 1,
   generationAnchor: "initial",
+  generationAmountMode: "auto",
+  generationFixedAmount: 0,
+  generationManualAmountsText: "",
   preview: null,
   previewStale: false,
   working: "",
@@ -147,6 +150,9 @@ function cache() {
   els.generationPayFrequency = document.getElementById("generation_pay_frequency");
   els.generationStubCount = document.getElementById("generation_stub_count");
   els.generationAnchor = document.getElementById("generation_anchor");
+  els.generationAmountMode = document.getElementById("generation_amount_mode");
+  els.generationFixedAmount = document.getElementById("generation_fixed_amount");
+  els.generationManualAmounts = document.getElementById("generation_manual_amounts");
   els.generationPlanSummary = document.getElementById("generation-plan-summary");
   els.profileSummary = document.getElementById("profile-summary");
   els.assignmentSelect = document.getElementById("assignment-select");
@@ -212,7 +218,7 @@ function bind() {
     persistDraft();
   });
 
-  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor].forEach((field) => {
+  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor, els.generationAmountMode, els.generationFixedAmount, els.generationManualAmounts].forEach((field) => {
     field.addEventListener("change", handleGenerationInput);
     field.addEventListener("input", handleGenerationInput);
   });
@@ -390,6 +396,9 @@ function restoreDraft() {
     state.generationPayFrequency = parsed.generationPayFrequency || state.generationPayFrequency;
     state.generationStubCount = Number(parsed.generationStubCount || state.generationStubCount);
     state.generationAnchor = parsed.generationAnchor || state.generationAnchor;
+    state.generationAmountMode = parsed.generationAmountMode || state.generationAmountMode;
+    state.generationFixedAmount = Number(parsed.generationFixedAmount || state.generationFixedAmount);
+    state.generationManualAmountsText = parsed.generationManualAmountsText || state.generationManualAmountsText;
     setDraftStatus("Restored your last local draft.");
   } catch {
     state.paystub = structuredClone(state.emptyPaystub);
@@ -422,6 +431,9 @@ function ensureDefaultSelections() {
   if (!["initial", "latest"].includes(state.generationAnchor)) {
     state.generationAnchor = "initial";
   }
+  if (!["auto", "fixed", "manual"].includes(state.generationAmountMode)) {
+    state.generationAmountMode = "auto";
+  }
   if (!Number.isFinite(state.generationStubCount) || state.generationStubCount < 1) {
     state.generationStubCount = 1;
   }
@@ -436,6 +448,9 @@ function applyGenerationPlanDefaults(plan = {}) {
   state.generationPayFrequency = plan.pay_frequency || "biweekly";
   state.generationStubCount = Number(plan.stub_count || 1);
   state.generationAnchor = plan.anchor || "initial";
+  state.generationAmountMode = plan.amount_mode || "auto";
+  state.generationFixedAmount = Number(plan.fixed_amount || 0);
+  state.generationManualAmountsText = (plan.manual_amounts || []).join("\n");
 }
 
 function resetGenerationPlan() {
@@ -443,6 +458,9 @@ function resetGenerationPlan() {
   state.generationSequenceType = "pay_frequency";
   state.generationStubCount = 1;
   state.generationAnchor = "initial";
+  state.generationAmountMode = "auto";
+  state.generationFixedAmount = 0;
+  state.generationManualAmountsText = "";
   syncGenerationFrequencyFromAssignment({ force: false });
 }
 
@@ -464,11 +482,16 @@ function handleGenerationInput() {
   state.generationPayFrequency = els.generationPayFrequency.value;
   state.generationStubCount = Math.max(1, Math.min(26, Number(els.generationStubCount.value || 1)));
   state.generationAnchor = els.generationAnchor.value;
+  state.generationAmountMode = els.generationAmountMode.value;
+  state.generationFixedAmount = numberValue(els.generationFixedAmount.value);
+  state.generationManualAmountsText = els.generationManualAmounts.value;
   if (state.generationMode === "single") {
     state.generationStubCount = 1;
   }
   state.previewStale = Boolean(state.preview);
   clearFieldError("generation_stub_count");
+  clearFieldError("generation_fixed_amount");
+  clearFieldError("generation_manual_amounts");
   renderForm();
   persistDraft();
   renderPreview();
@@ -481,6 +504,9 @@ function buildGenerationPlan() {
     pay_frequency: state.generationSequenceType === "weekly" ? "weekly" : state.generationPayFrequency,
     stub_count: state.generationMode === "multiple" ? state.generationStubCount : 1,
     anchor: state.generationAnchor,
+    amount_mode: state.generationAmountMode,
+    fixed_amount: state.generationAmountMode === "fixed" ? state.generationFixedAmount : 0,
+    manual_amounts: state.generationAmountMode === "manual" ? parseManualAmounts(state.generationManualAmountsText) : [],
   };
 }
 
@@ -949,10 +975,16 @@ function renderForm() {
   els.generationSequenceType.value = state.generationSequenceType;
   els.generationPayFrequency.value = state.generationSequenceType === "weekly" ? "weekly" : state.generationPayFrequency;
   els.generationAnchor.value = state.generationAnchor;
+  els.generationAmountMode.value = state.generationAmountMode;
+  els.generationFixedAmount.value = String(state.generationFixedAmount ?? 0);
+  els.generationManualAmounts.value = state.generationManualAmountsText || "";
   els.generationPayFrequency.disabled = state.generationMode === "single" || state.generationSequenceType === "weekly";
   els.generationStubCount.value = String(state.generationMode === "multiple" ? state.generationStubCount : 1);
   els.generationStubCount.disabled = state.generationMode === "single";
   els.generationAnchor.disabled = state.generationMode === "single";
+  els.generationAmountMode.disabled = state.generationMode === "single";
+  els.generationFixedAmount.disabled = state.generationMode === "single" || state.generationAmountMode !== "fixed";
+  els.generationManualAmounts.disabled = state.generationMode === "single" || state.generationAmountMode !== "manual";
   els.generateButton.textContent = state.generationMode === "multiple" ? "Generate Batch ZIP" : "Generate PDF";
   document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-frequency-field")?.toggleAttribute(
@@ -961,6 +993,9 @@ function renderForm() {
   );
   document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-anchor-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  document.getElementById("generation-amount-mode-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  document.getElementById("generation-fixed-amount-field")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "fixed");
+  document.getElementById("generation-manual-amounts-shell")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "manual");
   renderGenerationPlanSummary();
 
   renderComputedTaxLines();
@@ -1065,6 +1100,11 @@ function renderGenerationPlanSummary() {
     ? "Weekly"
     : state.generationPayFrequency.replace("semi", "semi-").replace(/\b\w/g, (char) => char.toUpperCase());
   const anchorLabel = state.generationAnchor === "latest" ? "Latest stub" : "Initial stub";
+  const amountLabel = state.generationAmountMode === "fixed"
+    ? `Fixed gross ${currency(state.generationFixedAmount)}`
+    : state.generationAmountMode === "manual"
+      ? "Manual gross amounts"
+      : "Auto calculate";
 
   const rows = (plan?.entries || [])
     .slice(0, 6)
@@ -1099,6 +1139,10 @@ function renderGenerationPlanSummary() {
         <div class="generation-summary-row">
           <span>Anchor</span>
           <strong>${escapeHtml(anchorLabel)}</strong>
+        </div>
+        <div class="generation-summary-row">
+          <span>Amounts</span>
+          <strong>${escapeHtml(amountLabel)}</strong>
         </div>
         ${rows || `<div class="generation-summary-row"><span>Schedule</span><strong>Preview needed</strong></div>`}
       </div>
@@ -1417,6 +1461,17 @@ function validate() {
   if (state.generationMode === "multiple") {
     if (!Number.isFinite(state.generationStubCount) || state.generationStubCount < 2 || state.generationStubCount > 26) {
       errors.generation_stub_count = "Use a value between 2 and 26 for multiple paystubs.";
+    }
+    if (state.generationAmountMode === "fixed" && numberValue(state.generationFixedAmount) <= 0) {
+      errors.generation_fixed_amount = "Enter a fixed gross amount.";
+    }
+    if (state.generationAmountMode === "manual") {
+      const manualAmounts = parseManualAmounts(state.generationManualAmountsText);
+      if (manualAmounts.length !== state.generationStubCount) {
+        errors.generation_manual_amounts = "Enter one gross amount per generated stub.";
+      } else if (manualAmounts.some((value) => value <= 0)) {
+        errors.generation_manual_amounts = "Manual stub amounts must all be greater than zero.";
+      }
     }
   }
 
@@ -1744,6 +1799,16 @@ function depositSummary(paystub) {
     parts.push("Full net pay");
   }
   return parts.join(" · ") || "Not provided";
+}
+
+function parseManualAmounts(value) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+  return text
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => numberValue(item));
 }
 
 function table(title, headers, rows) {

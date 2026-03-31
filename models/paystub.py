@@ -91,6 +91,8 @@ class Paystub(BaseModel):
     net_pay_current: Optional[float] = None
     net_pay_ytd: Optional[float] = None
 
+    manual_stub_amount: Optional[float] = None
+
     @model_validator(mode="after")
     def compute_totals(self) -> "Paystub":
         """Auto-compute any totals not explicitly provided, from line items."""

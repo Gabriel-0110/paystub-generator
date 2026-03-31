@@ -150,6 +150,29 @@
                   </select>
                   <small class="field-hint">Use the selected pay period as the start or end of the generated sequence.</small>
                 </label>
+                <label id="generation-amount-mode-field" class="field compact-field">
+                  <span>Stub amount mode</span>
+                  <select id="generation_amount_mode" name="generation_amount_mode" aria-label="Stub amount mode">
+                    <option value="auto">Auto calculate</option>
+                    <option value="fixed">Same amount for every stub</option>
+                    <option value="manual">Set each stub manually</option>
+                  </select>
+                  <small class="field-hint">Use the generated value, force one fixed gross amount, or define a custom amount for each stub.</small>
+                </label>
+                <label id="generation-fixed-amount-field" class="field compact-field" hidden>
+                  <span>Fixed gross amount</span>
+                  <input id="generation_fixed_amount" name="generation_fixed_amount" type="number" min="0" step="0.01" inputmode="decimal" />
+                  <small class="field-hint">Example: `1250.00` for every generated stub.</small>
+                  <small id="generation_fixed_amount-error" class="field-error" data-for="generation_fixed_amount" role="alert" aria-live="polite"></small>
+                </label>
+              </div>
+              <div id="generation-manual-amounts-shell" class="generation-manual-shell" hidden>
+                <label class="field">
+                  <span>Manual gross amounts</span>
+                  <textarea id="generation_manual_amounts" name="generation_manual_amounts" rows="4" placeholder="One amount per line"></textarea>
+                  <small class="field-hint">Enter one gross amount per stub in order, one per line.</small>
+                  <small id="generation_manual_amounts-error" class="field-error" data-for="generation_manual_amounts" role="alert" aria-live="polite"></small>
+                </label>
               </div>
               <div id="generation-plan-summary" class="generation-plan-summary" aria-live="polite"></div>
             </fieldset>

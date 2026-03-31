@@ -320,6 +320,74 @@ class YTDEngineTests(unittest.TestCase):
         self.assertGreater(plan["entries"][-1]["gross_pay_ytd"], plan["entries"][0]["gross_pay_ytd"])
         self.assertEqual(plan["entries"][-1]["gross_pay_ytd"], round(plan["entries"][-1]["gross_pay_current"] * 3, 2))
 
+    def test_guided_draft_generation_plan_can_use_fixed_stub_amount(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "weekly",
+                "pay_period_start": "2026-01-01",
+                "pay_period_end": "2026-01-07",
+                "pay_date": "2026-01-09",
+                "compensation_type": "hourly",
+                "hourly_rate": 25.0,
+                "regular_hours": 40.0,
+            }
+        )
+
+        plan = web_service.generation_plan_payload(
+            draft,
+            {
+                "mode": "multiple",
+                "sequence_type": "weekly",
+                "pay_frequency": "weekly",
+                "stub_count": 3,
+                "amount_mode": "fixed",
+                "fixed_amount": 1250.0,
+            },
+        )
+
+        self.assertEqual([entry["gross_pay_current"] for entry in plan["entries"]], [1250.0, 1250.0, 1250.0])
+
+    def test_guided_draft_generation_plan_can_use_manual_stub_amounts(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "weekly",
+                "pay_period_start": "2026-01-01",
+                "pay_period_end": "2026-01-07",
+                "pay_date": "2026-01-09",
+                "compensation_type": "hourly",
+                "hourly_rate": 25.0,
+                "regular_hours": 40.0,
+            }
+        )
+
+        plan = web_service.generation_plan_payload(
+            draft,
+            {
+                "mode": "multiple",
+                "sequence_type": "weekly",
+                "pay_frequency": "weekly",
+                "stub_count": 3,
+                "amount_mode": "manual",
+                "manual_amounts": [1250.0, 1325.0, 1190.0],
+            },
+        )
+
+        self.assertEqual([entry["gross_pay_current"] for entry in plan["entries"]], [1250.0, 1325.0, 1190.0])
+
 
 class TemplateRendererTests(unittest.TestCase):
     maxDiff = None
@@ -661,6 +729,11 @@ class WebAppTests(unittest.TestCase):
                 employee_id="EMP-2001",
                 employee_name="Jane Doe",
                 employee_address="100 OAK AVE\nMETROPOLIS, USA 10002",
+                bank_name="Metro Credit Union",
+                deposit_account_type="checking",
+                routing_number="021000021",
+                account_number="9876543210",
+                direct_deposit_amount=1200.0,
                 social_security_number="111-22-3333",
                 earnings=[EarningLine(label="Regular", rate=40.0, hours=80.0)],
                 other_benefits=[BenefitLine(label="PTO Hrs", current=8.0, ytd=8.0)],

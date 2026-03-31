@@ -78,6 +78,7 @@ SUPABASE_PROFILE_TABLE = "paystub_profile_records"
 GENERATION_MODES = {"single", "multiple"}
 GENERATION_SEQUENCE_TYPES = {"pay_frequency", "weekly"}
 GENERATION_ANCHORS = {"initial", "latest"}
+GENERATION_AMOUNT_MODES = {"auto", "fixed", "manual"}
 MAX_BATCH_STUBS = 26
 
 
@@ -314,6 +315,7 @@ def empty_paystub_payload() -> dict:
         "other_benefits": [],
         "important_notes": [],
         "footnotes": [],
+        "manual_stub_amount": None,
     }
 
 
@@ -394,10 +396,15 @@ def _build_automatic_employee_config(paystub: Paystub):
 
     earnings: list[EarningLine] = []
     primary_label = str(paystub.primary_earning_label or "Regular").strip() or "Regular"
+    manual_stub_amount = max(0.0, float(paystub.manual_stub_amount or 0.0))
     resolved_weekly_hours = max(0.0, float(paystub.weekly_hours or 0.0))
     resolved_hourly_rate = max(0.0, float(paystub.hourly_rate or 0.0))
     resolved_regular_hours = max(0.0, float(paystub.regular_hours or 0.0))
-    if str(paystub.compensation_type).lower() == "salary":
+    if manual_stub_amount:
+        earnings.append(EarningLine(label=primary_label, flat_amount=manual_stub_amount))
+        resolved_hourly_rate = 0.0
+        resolved_regular_hours = 0.0
+    elif str(paystub.compensation_type).lower() == "salary":
         periods = get_pay_periods(_parse_iso_date(paystub.pay_date).year, frequency)
         annual_salary = max(0.0, float(paystub.annual_salary or 0.0))
         if annual_salary:
@@ -535,6 +542,7 @@ def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict
             "adjustments": adjustments,
             "important_notes": paystub.important_notes,
             "footnotes": computed.get("footnotes", []) + list(paystub.footnotes),
+            "manual_stub_amount": round(float(paystub.manual_stub_amount or 0.0), 2) or None,
         }
     )
     return Paystub(**computed).model_dump(mode="json")
@@ -564,12 +572,29 @@ def normalize_generation_plan(plan: dict | None) -> dict:
     if anchor not in GENERATION_ANCHORS:
         raise HTTPException(status_code=400, detail=f"Unsupported schedule anchor: {anchor}")
 
+    amount_mode = str(raw.get("amount_mode", "auto") or "auto").strip().lower()
+    if amount_mode not in GENERATION_AMOUNT_MODES:
+        raise HTTPException(status_code=400, detail=f"Unsupported amount mode: {amount_mode}")
+
+    fixed_amount = float(raw.get("fixed_amount", 0.0) or 0.0)
+    manual_amounts = [float(value or 0.0) for value in (raw.get("manual_amounts") or [])]
+    if amount_mode == "fixed" and fixed_amount <= 0:
+        raise HTTPException(status_code=400, detail="Enter a fixed gross amount for generated stubs.")
+    if amount_mode == "manual":
+        if len(manual_amounts) != stub_count:
+            raise HTTPException(status_code=400, detail="Enter one manual amount for each generated stub.")
+        if any(value <= 0 for value in manual_amounts):
+            raise HTTPException(status_code=400, detail="Manual stub amounts must all be greater than zero.")
+
     return {
         "mode": mode,
         "sequence_type": sequence_type,
         "stub_count": stub_count,
         "pay_frequency": _coerce_frequency(raw.get("pay_frequency")).value,
         "anchor": anchor,
+        "amount_mode": amount_mode,
+        "fixed_amount": round(fixed_amount, 2),
+        "manual_amounts": [round(value, 2) for value in manual_amounts],
     }
 
 
@@ -738,14 +763,43 @@ def _roll_stub_forward(paystub: Paystub, period: dict, offset: int) -> dict:
     return Paystub(**payload).model_dump(mode="json")
 
 
+def _stub_amount_override(schedule: dict, index: int) -> float | None:
+    mode = schedule.get("amount_mode", "auto")
+    if mode == "fixed":
+        return float(schedule.get("fixed_amount", 0.0) or 0.0)
+    if mode == "manual":
+        amounts = schedule.get("manual_amounts") or []
+        if index < len(amounts):
+            return float(amounts[index] or 0.0)
+    return None
+
+
+def _paystub_with_manual_amount(paystub: Paystub, amount: float | None) -> Paystub:
+    if amount is None or amount <= 0:
+        return paystub
+    clone = paystub.model_copy(deep=True)
+    clone.manual_stub_amount = round(amount, 2)
+    clone.compensation_type = "manual"
+    clone.annual_salary = 0.0
+    clone.hourly_rate = 0.0
+    clone.regular_hours = 0.0
+    clone.source_earnings = []
+    return clone
+
+
 def build_generation_sequence(payload: dict | Paystub, plan: dict | None = None) -> dict:
     paystub = Paystub(**payload) if isinstance(payload, dict) else payload
     schedule = build_generation_schedule(paystub, plan)
     if _paystub_uses_automatic_builder(paystub):
         paystubs: list[dict] = []
         ytd_state = YTDState()
-        for period in schedule["periods"]:
-            computed = _compute_automatic_paystub(paystub, ytd_state=ytd_state, period=period)
+        for index, period in enumerate(schedule["periods"]):
+            override_amount = _stub_amount_override(schedule, index)
+            computed = _compute_automatic_paystub(
+                _paystub_with_manual_amount(paystub, override_amount),
+                ytd_state=ytd_state,
+                period=period,
+            )
             paystubs.append(computed)
             ytd_state.advance(computed)
         return {
