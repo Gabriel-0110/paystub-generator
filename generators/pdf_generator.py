@@ -209,6 +209,30 @@ def _masked_account(value: str) -> str:
     return f"XXXX{digits[-4:]}"
 
 
+def _masked_ssn(value: str) -> str:
+    digits = "".join(char for char in str(value or "") if char.isdigit())
+    if len(digits) < 4:
+        return ""
+    return f"xxx-xx-{digits[-4:]}"
+
+
+def _filing_summary_lines(paystub: Paystub) -> list[str]:
+    lines = [f"Taxable Marital Status: {paystub.taxable_marital_status or 'Not provided'}"]
+    federal_bits = []
+    allowances = int(paystub.allowances_count or 0)
+    if allowances > 0:
+        federal_bits.append(f"Allowances: {allowances}")
+    additional = round(float(paystub.additional_federal_withholding or 0.0), 2)
+    if additional > 0:
+        federal_bits.append(f"Additional Tax: {money(additional)}")
+    if federal_bits:
+        lines.append(f"Federal: {' · '.join(federal_bits)}")
+    state = str(paystub.work_state or "").strip().upper()
+    if state:
+        lines.append(f"State: {state}")
+    return lines
+
+
 def _coerced_font_size(size: float) -> float:
     return round(float(size), 2)
 
@@ -1116,25 +1140,15 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_box(c, margin, margin, frame_w, frame_h, fill=PAPER, stroke=GRID_STRONG, lw=0.7)
     fill_rect(c, margin, page_top - 3, frame_w, 3, INK)
 
-    bc_x, bc_y = margin + 4, PAGE_HEIGHT - margin - 22
-    bc_w, bc_h = 22, 17
-    c.setFillColor(INK)
-    c.rect(bc_x, bc_y, bc_w, bc_h, fill=1, stroke=0)
-    c.setFillColor(WHITE)
-    for i in range(1, 6):
-        bh = 1.5 if i % 2 == 0 else 0.8
-        c.rect(bc_x + 2, bc_y + i * 2.8, bc_w - 4, bh, fill=1, stroke=0)
-    c.setFillColor(BLACK)
-
     top_y = PAGE_HEIGHT - margin - 4
-    for label, xpos in [("CO.", 42), ("FILE", 66), ("DEPT.", 92), ("CLOCK", 122), ("NUMBER", 160)]:
+    for label, xpos in [("CO.", 42), ("FILE", 74), ("DEPT.", 114), ("CLOCK", 154), ("NUMBER", 214)]:
         draw_text(c, xpos, top_y - 10, label, size=5, color=TEXT_MUTED)
 
     draw_text(c, 42, top_y - 20, _company_code(paystub), size=6, color=TEXT)
-    draw_text(c, 66, top_y - 20, paystub.employee_id[:8] if paystub.employee_id else "", size=6, color=TEXT)
-    draw_text(c, 92, top_y - 20, paystub.work_state or "", size=6, color=TEXT)
-    draw_text(c, 122, top_y - 20, "", size=6, color=TEXT)
-    draw_text(c, 160, top_y - 20, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
+    draw_text(c, 74, top_y - 20, paystub.employee_id[:8] if paystub.employee_id else "", size=6, color=TEXT)
+    draw_text(c, 114, top_y - 20, paystub.work_state or "", size=6, color=TEXT)
+    draw_text(c, 154, top_y - 20, "", size=6, color=TEXT)
+    draw_text(c, 214, top_y - 20, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
 
     left_text_x = 38
     right_block_x = 348
@@ -1144,7 +1158,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_address_block(c, left_text_x, top_y - 47, _format_address(paystub.company_address), size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
 
     draw_text(c, right_block_x, top_y - 20, "Earnings Statement", size=13, bold=True, color=TEXT)
-    draw_logo_or_badge(c, right_block_x + 162, top_y - 29, 50, 18, text="PG")
     draw_text(c, right_block_x, top_y - 39, "Period ending:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 39, paystub.pay_period_end, size=6.6, color=TEXT)
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
@@ -1154,10 +1167,8 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
 
     tax_y = top_y - 102
     draw_text(c, left_text_x, tax_y, f"Social Security Number: {paystub.social_security_number or 'Not provided'}", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 9, f"Taxable Marital Status: {paystub.taxable_marital_status or 'Not provided'}", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 18, f"Federal: {paystub.exemptions_allowances or '0'}", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 27, f"Additional Tax: {num(paystub.additional_federal_withholding)}", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 36, f"State: {paystub.work_state or ''}", size=6.4, color=TEXT)
+    for index, line in enumerate(_filing_summary_lines(paystub), start=1):
+        draw_text(c, left_text_x, tax_y - (9 * index), line, size=6.4, color=TEXT)
 
     statement_top = 590
     left_x = margin + 6
@@ -1262,7 +1273,7 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     ck_w = PAGE_WIDTH - margin * 2
     ck_h = 144
     strip_h = 32
-    div_x = ck_x + 230
+    div_x = ck_x + 390
     side_strip = 8
 
     security_fill = colors.HexColor("#C9C9C4")
@@ -1286,27 +1297,28 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     fill_rect(c, ck_x + ck_w - side_strip, ck_y, side_strip, ck_h, colors.HexColor("#8D8D88"))
     fill_rect(c, ck_x + side_strip, ck_y + ck_h - strip_h, ck_w - side_strip * 2, strip_h, colors.HexColor("#EFEEE8"))
     draw_rule(c, ck_x + side_strip, ck_y + ck_h - strip_h, ck_x + ck_w - side_strip, ck_y + ck_h - strip_h, color=GRID, lw=0.4)
-    draw_rule(c, div_x, ck_y + ck_h - strip_h + 2, div_x, ck_y + ck_h - 2, color=GRID, lw=0.4)
+    draw_rule(c, div_x, ck_y + 12, div_x, ck_y + ck_h - 2, color=GRID, lw=0.4)
 
     logo_sz = 20
     logo_x = ck_x + side_strip + 8
     logo_y_pos = ck_y + ck_h - strip_h + (strip_h - logo_sz) // 2
     draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text="PG")
 
-    draw_fit_text(c, logo_x + logo_sz + 18, ck_y + ck_h - 10, 155, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
-    draw_address_block(c, logo_x + logo_sz + 18, ck_y + ck_h - 20, _format_address(paystub.company_address), size=6, color=TEXT, width=155, max_lines=2)
+    left_panel_w = div_x - (ck_x + side_strip + 18)
+    draw_fit_text(c, logo_x + logo_sz + 18, ck_y + ck_h - 10, left_panel_w - 52, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
+    draw_address_block(c, logo_x + logo_sz + 18, ck_y + ck_h - 20, _format_address(paystub.company_address), size=6, color=TEXT, width=left_panel_w - 52, max_lines=2)
 
     draw_text(c, div_x + 8, ck_y + ck_h - 9, "Payroll check number:", size=6, bold=True, color=TEXT)
-    draw_text(c, div_x + 110, ck_y + ck_h - 9, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
+    draw_text(c, div_x + 92, ck_y + ck_h - 9, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 19, "Pay date:", size=6, bold=True, color=TEXT)
-    draw_text(c, div_x + 110, ck_y + ck_h - 19, paystub.pay_date, size=6, color=TEXT)
+    draw_text(c, div_x + 92, ck_y + ck_h - 19, paystub.pay_date, size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 29, "Social Security No.", size=6, bold=True, color=TEXT)
-    draw_text(c, div_x + 110, ck_y + ck_h - 29, paystub.social_security_number, size=6, color=TEXT)
+    draw_text(c, div_x + 92, ck_y + ck_h - 29, _masked_ssn(paystub.social_security_number), size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 39, "Net pay:", size=6, bold=True, color=TEXT)
-    draw_text(c, div_x + 110, ck_y + ck_h - 39, money(paystub.net_pay_current), size=6, bold=True, color=INK)
+    draw_text(c, div_x + 92, ck_y + ck_h - 39, money(paystub.net_pay_current), size=6, bold=True, color=INK)
     if paystub.bank_name:
         draw_text(c, div_x + 8, ck_y + ck_h - 49, "Bank:", size=6, bold=True, color=TEXT)
-        draw_fit_text(c, div_x + 110, ck_y + ck_h - 49, 96, paystub.bank_name, size=6, min_size=5.2, color=TEXT)
+        draw_fit_text(c, div_x + 92, ck_y + ck_h - 49, 120, paystub.bank_name, size=6, min_size=5.2, color=TEXT)
     if paystub.deposit_account_type or paystub.account_number:
         draw_text(c, div_x + 8, ck_y + ck_h - 59, "Deposit:", size=6, bold=True, color=TEXT)
         deposit_bits = []
@@ -1314,16 +1326,16 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
             deposit_bits.append(str(paystub.deposit_account_type).title())
         if paystub.account_number:
             deposit_bits.append(_masked_account(paystub.account_number))
-        draw_fit_text(c, div_x + 110, ck_y + ck_h - 59, 96, " ".join(deposit_bits), size=6, min_size=5.2, color=TEXT)
+        draw_fit_text(c, div_x + 92, ck_y + ck_h - 59, 120, " ".join(deposit_bits), size=6, min_size=5.2, color=TEXT)
     if paystub.routing_number:
         draw_text(c, div_x + 8, ck_y + ck_h - 69, "Routing:", size=6, bold=True, color=TEXT)
-        draw_text(c, div_x + 110, ck_y + ck_h - 69, str(paystub.routing_number), size=6, color=TEXT)
+        draw_text(c, div_x + 92, ck_y + ck_h - 69, str(paystub.routing_number), size=6, color=TEXT)
 
     body_top = ck_y + ck_h - strip_h
 
     payee_x = ck_x + side_strip + 10
     payee_line_x = ck_x + side_strip + 64
-    payee_line_w = 300
+    payee_line_w = div_x - payee_line_x - 18
     draw_text(c, payee_x, body_top - 12, "PAY TO THE", size=6, bold=True, color=TEXT)
     draw_text(c, payee_x, body_top - 21, "ORDER OF", size=6, bold=True, color=TEXT)
     draw_fit_text(c, payee_line_x, body_top - 20, payee_line_w - 4, paystub.employee_name.upper(), size=9, min_size=7, bold=True, color=INK)
@@ -1332,18 +1344,18 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     words = amount_to_words(paystub.net_pay_current)
     amount_words_x = payee_line_x
     amount_words_y = body_top - 38
-    amount_words_w = 318
+    amount_words_w = div_x - amount_words_x - 18
     draw_wrapped_text(c, amount_words_x, amount_words_y, amount_words_w, words, size=7, bold=False, color=TEXT, leading=9, max_lines=2)
     draw_rule(c, amount_words_x, body_top - 49, amount_words_x + amount_words_w, body_top - 49, color=BLACK, lw=0.4)
 
     amt_box_w = 92
     amt_box_h = 20
-    amt_box_x = ck_x + ck_w - side_strip - amt_box_w - 12
+    amt_box_x = div_x - amt_box_w - 12
     amt_box_y = body_top - 48
     draw_box(c, amt_box_x, amt_box_y, amt_box_w, amt_box_h, fill=WHITE, lw=0.8)
     draw_right(c, amt_box_x + amt_box_w - 6, amt_box_y + 6, money(paystub.net_pay_current), size=10, bold=True, color=INK)
 
-    sig_x1 = ck_x + ck_w - 190
+    sig_x1 = div_x + 24
     sig_x2 = ck_x + ck_w - side_strip - 14
     sig_y = ck_y + 38
     draw_rule(c, sig_x1, sig_y, sig_x2, sig_y, color=BLACK, lw=0.7)
@@ -1352,11 +1364,12 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     c.setStrokeColor(TEXT)
     c.setLineWidth(0.9)
     path = c.beginPath()
-    sx, sy2 = sig_x1 + 10, sig_y + 9
+    sx, sy2 = sig_x1 + 8, sig_y + 7
     path.moveTo(sx, sy2)
-    path.curveTo(sx + 12, sy2 + 9, sx + 24, sy2 - 3, sx + 36, sy2 + 7)
-    path.curveTo(sx + 48, sy2 + 15, sx + 60, sy2 + 1, sx + 72, sy2 + 10)
-    path.curveTo(sx + 82, sy2 + 16, sx + 94, sy2 + 4, sx + 104, sy2 + 8)
+    path.curveTo(sx + 10, sy2 + 7, sx + 24, sy2 - 6, sx + 38, sy2 + 5)
+    path.curveTo(sx + 48, sy2 + 13, sx + 62, sy2 - 2, sx + 76, sy2 + 8)
+    path.curveTo(sx + 88, sy2 + 15, sx + 104, sy2 + 1, sx + 122, sy2 + 10)
+    path.curveTo(sx + 138, sy2 + 18, sx + 156, sy2 - 3, sx + 174, sy2 + 6)
     c.drawPath(path, stroke=1, fill=0)
     c.restoreState()
 

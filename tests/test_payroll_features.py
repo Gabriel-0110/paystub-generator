@@ -460,6 +460,10 @@ class TemplateRendererTests(unittest.TestCase):
                 "pay_period_end": "2026-02-28",
                 "pay_date": "2026-03-05",
                 "payroll_check_number": "000004219",
+                "allowances_count": 0,
+                "additional_federal_withholding": 0.0,
+                "work_state": "NY",
+                "social_security_number": "109-96-8419",
                 "employee_address": "4834 64TH STREET, FL 2\nWOODSIDE, NY 11377",
                 "other_benefits": [],
                 "important_notes": [],
@@ -482,6 +486,12 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertIn("4834 64TH STREET, FL 2", text)
         self.assertIn("WOODSIDE, NY 11377", text)
         self.assertIn("Payroll check number: 000004219", text)
+        self.assertIn("Taxable Marital Status: Single", text)
+        self.assertIn("State: NY", text)
+        self.assertNotIn("Federal: Federal:", text)
+        self.assertNotIn("Additional Tax: 0.00", text)
+        self.assertIn("Social Security No. xxx-xx-8419", text)
+        self.assertNotIn("Social Security No. 109-96-8419", text)
         self.assertNotIn("SAMPLE", text)
         self.assertNotIn("VOID", text)
         self.assertNotIn("NON-NEGOTIABLE", text)
