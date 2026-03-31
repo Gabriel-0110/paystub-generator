@@ -25,41 +25,41 @@ class FilingStatus(str, Enum):
 
 # ── 2026 Federal tax constants (estimated) ────────────────────────────────────
 
-# Standard deductions 2026 (estimated: 2025 + ~2.8% COLA)
+# Standard deductions 2026 (official IRS)
 _STD_DEDUCTION: dict[FilingStatus, float] = {
-    FilingStatus.SINGLE:            15_450,
-    FilingStatus.MARRIED:           30_900,
-    FilingStatus.HEAD_OF_HOUSEHOLD: 23_150,
+    FilingStatus.SINGLE:            16_100,
+    FilingStatus.MARRIED:           32_200,
+    FilingStatus.HEAD_OF_HOUSEHOLD: 24_150,
 }
 
 # (lower, upper, marginal_rate) — income above lower up to upper is taxed at rate
 _FEDERAL_BRACKETS: dict[FilingStatus, list[tuple[float, float, float]]] = {
     FilingStatus.SINGLE: [
-        (0,        12_300,  0.10),
-        (12_300,   49_875,  0.12),
-        (49_875,  106_200,  0.22),
-        (106_200, 202_900,  0.24),
-        (202_900, 257_650,  0.32),
-        (257_650, 644_050,  0.35),
-        (644_050, float("inf"), 0.37),
+        (0,        12_400,  0.10),
+        (12_400,   50_400,  0.12),
+        (50_400,  105_700,  0.22),
+        (105_700, 201_775,  0.24),
+        (201_775, 256_225,  0.32),
+        (256_225, 640_600,  0.35),
+        (640_600, float("inf"), 0.37),
     ],
     FilingStatus.MARRIED: [
-        (0,        24_600,  0.10),
-        (24_600,   99_750,  0.12),
-        (99_750,  212_400,  0.22),
-        (212_400, 405_800,  0.24),
-        (405_800, 515_300,  0.32),
-        (515_300, 773_300,  0.35),
-        (773_300, float("inf"), 0.37),
+        (0,        24_800,  0.10),
+        (24_800,  100_800,  0.12),
+        (100_800, 211_400,  0.22),
+        (211_400, 403_550,  0.24),
+        (403_550, 512_450,  0.32),
+        (512_450, 768_700,  0.35),
+        (768_700, float("inf"), 0.37),
     ],
     FilingStatus.HEAD_OF_HOUSEHOLD: [
-        (0,        17_500,  0.10),
-        (17_500,   66_700,  0.12),
-        (66_700,  106_200,  0.22),
-        (106_200, 202_900,  0.24),
-        (202_900, 257_600,  0.32),
-        (257_600, 644_050,  0.35),
-        (644_050, float("inf"), 0.37),
+        (0,        17_700,  0.10),
+        (17_700,   67_450,  0.12),
+        (67_450,  105_700,  0.22),
+        (105_700, 201_750,  0.24),
+        (201_750, 256_200,  0.32),
+        (256_200, 640_600,  0.35),
+        (640_600, float("inf"), 0.37),
     ],
 }
 
@@ -276,6 +276,7 @@ class EmployeePayConfig:
     company_name:    str
     company_address: str
 
+    employee_title:         str = ""
     social_security_number: str = ""
     bank_name:              str = ""
     deposit_account_type:   str = ""
@@ -499,6 +500,7 @@ def compute_paystub_data(
         "company_name":            config.company_name,
         "company_address":         config.company_address,
         "employee_name":           config.employee_name,
+        "employee_title":          config.employee_title,
         "employee_address":        config.employee_address,
         "employee_id":             config.employee_id,
         "bank_name":               config.bank_name,

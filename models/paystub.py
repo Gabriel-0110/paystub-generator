@@ -40,6 +40,7 @@ class Paystub(BaseModel):
     company_name: str
     company_address: str
     employee_name: str
+    employee_title: str = ""
     employee_address: str = ""
     employee_id: str
     pay_date: str

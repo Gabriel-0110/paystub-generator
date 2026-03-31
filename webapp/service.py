@@ -280,6 +280,7 @@ def empty_paystub_payload() -> dict:
         "company_name": "",
         "company_address": "",
         "employee_name": "",
+        "employee_title": "",
         "employee_address": "",
         "employee_id": "",
         "bank_name": "",
@@ -467,6 +468,7 @@ def _build_automatic_employee_config(paystub: Paystub):
     config = EmployeePayConfig(
         employee_id=paystub.employee_id,
         employee_name=paystub.employee_name,
+        employee_title=paystub.employee_title,
         employee_address=paystub.employee_address,
         bank_name=paystub.bank_name,
         deposit_account_type=paystub.deposit_account_type,
@@ -554,6 +556,7 @@ def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict
             "footnotes": computed.get("footnotes", []) + list(paystub.footnotes),
             "manual_stub_amount": round(float(paystub.manual_stub_amount or 0.0), 2) or None,
             "company_logo": paystub.company_logo or "",
+            "employee_title": paystub.employee_title or "",
         }
     )
     return Paystub(**computed).model_dump(mode="json")

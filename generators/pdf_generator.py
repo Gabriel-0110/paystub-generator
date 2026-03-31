@@ -971,7 +971,10 @@ def _render_simple_stub(c: canvas.Canvas, paystub: Paystub) -> None:
     info_top = page_top - header_h - 10
     info_gap = 8
     info_w = (width - info_gap * 3) / 4
-    draw_form_field(c, margin, info_top, info_w, 44, "Employee", paystub.employee_name.upper(), max_value_lines=2)
+    emp_label = "Employee"
+    if paystub.employee_title:
+        emp_label = f"Employee · {paystub.employee_title}"
+    draw_form_field(c, margin, info_top, info_w, 44, emp_label, paystub.employee_name.upper(), max_value_lines=2)
     draw_form_field(c, margin + info_w + info_gap, info_top, info_w, 44, "Employee ID", paystub.employee_id, max_value_lines=1)
     draw_form_field(c, margin + (info_w + info_gap) * 2, info_top, info_w, 44, "Pay Date", paystub.pay_date, max_value_lines=1)
     draw_form_field(
@@ -1069,7 +1072,10 @@ def _render_adp_like_statement(c: canvas.Canvas, paystub: Paystub) -> None:
     block_top = page_top - header_h - 10
     block_gap = 8
     block_w = (width - block_gap * 2) / 3
-    draw_form_field(c, margin, block_top, block_w, 46, "Employee", paystub.employee_name.upper(), max_value_lines=2)
+    emp_label2 = "Employee"
+    if paystub.employee_title:
+        emp_label2 = f"Employee · {paystub.employee_title}"
+    draw_form_field(c, margin, block_top, block_w, 46, emp_label2, paystub.employee_name.upper(), max_value_lines=2)
     draw_form_field(c, margin + block_w + block_gap, block_top, block_w, 46, "Pay Date", paystub.pay_date, max_value_lines=1)
     draw_form_field(c, margin + (block_w + block_gap) * 2, block_top, block_w, 46, "Pay Period", f"{paystub.pay_period_start} to {paystub.pay_period_end}", value_size=7.6)
 
@@ -1179,18 +1185,18 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_address_block(c, left_text_x, top_y - 47, _format_address(paystub.company_address), size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
 
     draw_text(c, right_block_x, top_y - 20, "Earnings Statement", size=13, bold=True, color=TEXT)
-    # ADP logo always in top-right corner of earnings statement
+    # ADP logo in top-right corner of earnings statement (always shown, no company logo here)
     logo_es_size = 28
     adp_logo_x = right_block_x + right_block_w - logo_es_size
     draw_logo_or_badge(c, adp_logo_x, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo="")
-    # Company logo next to ADP when provided
-    if paystub.company_logo and paystub.company_logo.strip():
-        draw_logo_or_badge(c, adp_logo_x - logo_es_size - 4, top_y - 6, logo_es_size, logo_es_size, text=_company_code(paystub), custom_logo=paystub.company_logo)
     draw_text(c, right_block_x, top_y - 39, "Period ending:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 39, paystub.pay_period_end, size=6.6, color=TEXT)
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 50, paystub.pay_date, size=6.6, color=TEXT)
-    draw_wrapped_text(c, right_block_x, top_y - 70, right_block_w, paystub.employee_name.upper(), size=8.8, bold=True, color=TEXT, leading=9, max_lines=3)
+    emp_name_line = paystub.employee_name.upper()
+    if paystub.employee_title:
+        emp_name_line += f"  ·  {paystub.employee_title.upper()}"
+    draw_wrapped_text(c, right_block_x, top_y - 70, right_block_w, emp_name_line, size=8.8, bold=True, color=TEXT, leading=9, max_lines=3)
     draw_wrapped_text(c, right_block_x, top_y - 96, right_block_w, (_format_address(paystub.employee_address) or "NOT PROVIDED").upper(), size=7.6, bold=True, color=TEXT, leading=8.5, max_lines=3)
 
     tax_y = top_y - 102
@@ -1334,16 +1340,13 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_rule(c, ck_x + side_strip, ck_y + ck_h - strip_h, ck_x + ck_w - side_strip, ck_y + ck_h - strip_h, color=GRID, lw=0.4)
     draw_rule(c, div_x, ck_y + 12, div_x, ck_y + ck_h - 2, color=GRID, lw=0.4)
 
-    logo_sz = 20
-    logo_x = ck_x + side_strip + 8
+    logo_sz = 28
+    logo_x = ck_x + side_strip + 6
     logo_y_pos = ck_y + ck_h - strip_h + (strip_h - logo_sz) // 2
-    # Always draw ADP logo on the check
-    draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text=_company_code(paystub), custom_logo="")
-    text_offset_x = logo_x + logo_sz + 18
-    # Company logo next to ADP when provided
-    if paystub.company_logo and paystub.company_logo.strip():
-        draw_logo_or_badge(c, logo_x + 40, logo_y_pos, 36, logo_sz, text=_company_code(paystub), custom_logo=paystub.company_logo)
-        text_offset_x = logo_x + logo_sz + 56
+    # Company logo on the check (no ADP here); fall back to ADP if no custom logo
+    custom_logo = paystub.company_logo if paystub.company_logo and paystub.company_logo.strip() else ""
+    draw_logo_or_badge(c, logo_x, logo_y_pos, 40, logo_sz, text=_company_code(paystub), custom_logo=custom_logo)
+    text_offset_x = logo_x + logo_sz + 16
 
     left_panel_w = div_x - (ck_x + side_strip + 18)
     draw_fit_text(c, text_offset_x, ck_y + ck_h - 10, left_panel_w - 52, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
