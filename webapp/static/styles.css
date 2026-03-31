@@ -431,7 +431,7 @@ a {
 .generation-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .generation-plan-summary {
@@ -674,6 +674,22 @@ a {
     box-shadow 180ms ease,
     transform 180ms ease,
     background-color 180ms ease;
+}
+
+.field-inline input[readonly] {
+  color: var(--muted);
+  background: rgba(244, 240, 234, 0.92);
+}
+
+.field-inline input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  align-self: center;
+  justify-self: start;
+  accent-color: #171614;
+  box-shadow: none;
 }
 
 .field textarea {

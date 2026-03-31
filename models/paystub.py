@@ -11,10 +11,23 @@ class EarningItem(BaseModel):
     ytd: float
 
 
+class DraftEarningItem(BaseModel):
+    label: str
+    rate: float = 0.0
+    hours: float = 0.0
+    amount: float = 0.0
+
+
 class DeductionItem(BaseModel):
     label: str
     current: float
     ytd: float
+
+
+class DraftDeductionItem(BaseModel):
+    label: str
+    amount: float = 0.0
+    is_pretax: bool = False
 
 
 class NoteItem(BaseModel):
@@ -37,6 +50,21 @@ class Paystub(BaseModel):
     taxable_marital_status: str = ""
     exemptions_allowances: str = ""
     payroll_check_number: str = ""
+    work_state: str = "NY"
+    pay_frequency: str = "biweekly"
+    allowances_count: int = 0
+    additional_federal_withholding: float = 0.0
+    compensation_type: str = "hourly"
+    primary_earning_label: str = "Regular"
+    annual_salary: float = 0.0
+    hourly_rate: float = 0.0
+    regular_hours: float = 0.0
+    draft_mode: bool = False
+    auto_calculate_taxes: bool = True
+    auto_add_state_deductions: bool = True
+
+    source_earnings: List[DraftEarningItem] = Field(default_factory=list)
+    source_deductions: List[DraftDeductionItem] = Field(default_factory=list)
 
     earnings: List[EarningItem] = Field(default_factory=list)
     taxes: List[DeductionItem] = Field(default_factory=list)

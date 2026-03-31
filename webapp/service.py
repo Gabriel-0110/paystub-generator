@@ -13,7 +13,15 @@ import httpx
 
 from generators.pdf_generator import PaystubTemplate, generate_paystub_pdf
 from models.pay_period import get_pay_periods
-from models.payroll_calculator import BenefitLine, DeductionLine, EarningLine, FilingStatus, compute_paystub_data
+from models.payroll_calculator import (
+    BenefitLine,
+    DeductionLine,
+    EarningLine,
+    EmployeePayConfig,
+    FilingStatus,
+    YTDState,
+    compute_paystub_data,
+)
 from models.paystub import Paystub
 from models.profile_io import (
     export_profiles_csv,
@@ -69,6 +77,7 @@ PROFILE_TYPES = ("company", "employee", "tax", "deduction", "assignment")
 SUPABASE_PROFILE_TABLE = "paystub_profile_records"
 GENERATION_MODES = {"single", "multiple"}
 GENERATION_SEQUENCE_TYPES = {"pay_frequency", "weekly"}
+GENERATION_ANCHORS = {"initial", "latest"}
 MAX_BATCH_STUBS = 26
 
 
@@ -266,6 +275,7 @@ def _load_assignment_employee_pay_config_supabase(assignment_id: str):
 
 def empty_paystub_payload() -> dict:
     return {
+        "draft_mode": True,
         "company_name": "",
         "company_address": "",
         "employee_name": "",
@@ -275,10 +285,23 @@ def empty_paystub_payload() -> dict:
         "pay_period_start": "",
         "pay_period_end": "",
         "social_security_number": "",
-        "taxable_marital_status": "",
+        "taxable_marital_status": FilingStatus.SINGLE.value,
         "exemptions_allowances": "",
         "payroll_check_number": "",
-        "earnings": [{"label": "Regular", "rate": 0.0, "hours": 0.0, "current": 0.0, "ytd": 0.0}],
+        "work_state": "NY",
+        "pay_frequency": PayFrequency.BIWEEKLY.value,
+        "allowances_count": 0,
+        "additional_federal_withholding": 0.0,
+        "compensation_type": "hourly",
+        "primary_earning_label": "Regular",
+        "annual_salary": 0.0,
+        "hourly_rate": 0.0,
+        "regular_hours": 80.0,
+        "auto_calculate_taxes": True,
+        "auto_add_state_deductions": True,
+        "source_earnings": [],
+        "source_deductions": [],
+        "earnings": [],
         "taxes": [],
         "deductions": [],
         "adjustments": [],
@@ -302,12 +325,14 @@ def sample_paystub_payload() -> dict:
 
 def normalize_paystub_payload(payload: dict | Paystub) -> dict:
     paystub = payload if isinstance(payload, Paystub) else Paystub(**payload)
+    if _paystub_uses_automatic_builder(paystub) and not (paystub.earnings or paystub.taxes or paystub.deductions):
+        return _compute_automatic_paystub(paystub)
     return paystub.model_dump(mode="json")
 
 
 def preview_payload(payload: dict | Paystub) -> dict:
     paystub = Paystub(**payload) if isinstance(payload, dict) else payload
-    normalized = paystub.model_dump(mode="json")
+    normalized = normalize_paystub_payload(paystub)
     return {
         "paystub": normalized,
         "summary": {
@@ -343,6 +368,142 @@ def _coerce_frequency(value: str | PayFrequency | None) -> PayFrequency:
         raise HTTPException(status_code=400, detail=f"Unsupported pay frequency: {value}") from exc
 
 
+def _coerce_filing_status(value: str | FilingStatus | None) -> FilingStatus:
+    if isinstance(value, FilingStatus):
+        return value
+    normalized = str(value or FilingStatus.SINGLE.value).strip().lower()
+    for status in FilingStatus:
+        if normalized == status.value.lower():
+            return status
+    raise HTTPException(status_code=400, detail=f"Unsupported filing status: {value}")
+
+
+def _paystub_uses_automatic_builder(paystub: Paystub) -> bool:
+    return bool(paystub.draft_mode)
+
+
+def _build_automatic_employee_config(paystub: Paystub):
+    frequency = _coerce_frequency(paystub.pay_frequency)
+    filing_status = _coerce_filing_status(paystub.taxable_marital_status)
+
+    earnings: list[EarningLine] = []
+    primary_label = str(paystub.primary_earning_label or "Regular").strip() or "Regular"
+    if str(paystub.compensation_type).lower() == "salary":
+        periods = get_pay_periods(_parse_iso_date(paystub.pay_date).year, frequency)
+        annual_salary = max(0.0, float(paystub.annual_salary or 0.0))
+        if annual_salary:
+            per_period_salary = round(annual_salary / max(1, len(periods)), 2)
+            earnings.append(EarningLine(label=primary_label, rate=per_period_salary, hours=1.0))
+    else:
+        hourly_rate = max(0.0, float(paystub.hourly_rate or 0.0))
+        regular_hours = max(0.0, float(paystub.regular_hours or 0.0))
+        if hourly_rate or regular_hours:
+            earnings.append(EarningLine(label=primary_label, rate=hourly_rate, hours=regular_hours))
+
+    for item in paystub.source_earnings:
+        if not str(item.label).strip():
+            continue
+        amount = round(float(item.amount or 0.0), 2)
+        if amount:
+            earnings.append(EarningLine(label=item.label, flat_amount=amount))
+            continue
+        earnings.append(
+            EarningLine(
+                label=item.label,
+                rate=max(0.0, float(item.rate or 0.0)),
+                hours=max(0.0, float(item.hours or 0.0)),
+            )
+        )
+
+    pre_tax_deductions: list[DeductionLine] = []
+    post_tax_deductions: list[DeductionLine] = []
+    for item in paystub.source_deductions:
+        if not str(item.label).strip() or float(item.amount or 0.0) <= 0:
+            continue
+        deduction = DeductionLine(
+            label=item.label,
+            amount=round(float(item.amount or 0.0), 2),
+            is_pretax=bool(item.is_pretax),
+        )
+        if deduction.is_pretax:
+            pre_tax_deductions.append(deduction)
+        else:
+            post_tax_deductions.append(deduction)
+
+    return EmployeePayConfig(
+        employee_id=paystub.employee_id,
+        employee_name=paystub.employee_name,
+        employee_address=paystub.employee_address,
+        social_security_number=paystub.social_security_number,
+        company_name=paystub.company_name,
+        company_address=paystub.company_address,
+        filing_status=filing_status,
+        frequency=frequency,
+        allowances=max(0, int(paystub.allowances_count or 0)),
+        additional_federal_wh=max(0.0, float(paystub.additional_federal_withholding or 0.0)),
+        state=str(paystub.work_state or "NY").upper(),
+        earnings=earnings,
+        pre_tax_deductions=pre_tax_deductions,
+        post_tax_deductions=post_tax_deductions,
+        other_benefits=[BenefitLine(label=item.label, current=item.current, ytd=item.ytd) for item in paystub.other_benefits],
+        important_notes=list(paystub.important_notes),
+        payroll_check_number=paystub.payroll_check_number,
+        apply_ny_paid_family_leave=bool(paystub.auto_add_state_deductions),
+    )
+
+
+def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict | None = None) -> dict:
+    config = _build_automatic_employee_config(paystub)
+    if period:
+        config.payroll_check_number = period["payroll_check_number"]
+        pay_period_start = _parse_iso_date(period["pay_period_start"])
+        pay_period_end = _parse_iso_date(period["pay_period_end"])
+        pay_date = _parse_iso_date(period["pay_date"])
+    else:
+        pay_period_start = _parse_iso_date(paystub.pay_period_start)
+        pay_period_end = _parse_iso_date(paystub.pay_period_end)
+        pay_date = _parse_iso_date(paystub.pay_date)
+    computed = compute_paystub_data(
+        config,
+        pay_period_start,
+        pay_period_end,
+        pay_date,
+        ytd=ytd_state,
+    )
+    adjustments = []
+    for item in paystub.adjustments:
+        prior_adjustment_ytd = 0.0 if ytd_state is None else ytd_state.adjustments.get(item.label, 0.0)
+        adjustments.append(
+            {
+                "label": item.label,
+                "current": item.current,
+                "ytd": round(prior_adjustment_ytd + item.current, 2),
+            }
+        )
+    computed.update(
+        {
+            "draft_mode": paystub.draft_mode,
+            "work_state": str(paystub.work_state or "NY").upper(),
+            "pay_frequency": config.frequency.value,
+            "allowances_count": max(0, int(paystub.allowances_count or 0)),
+            "additional_federal_withholding": max(0.0, float(paystub.additional_federal_withholding or 0.0)),
+            "compensation_type": paystub.compensation_type,
+            "primary_earning_label": paystub.primary_earning_label,
+            "annual_salary": round(float(paystub.annual_salary or 0.0), 2),
+            "hourly_rate": round(float(paystub.hourly_rate or 0.0), 2),
+            "regular_hours": round(float(paystub.regular_hours or 0.0), 2),
+            "auto_calculate_taxes": paystub.auto_calculate_taxes,
+            "auto_add_state_deductions": paystub.auto_add_state_deductions,
+            "source_earnings": [item.model_dump(mode="json") for item in paystub.source_earnings],
+            "source_deductions": [item.model_dump(mode="json") for item in paystub.source_deductions],
+            "adjustments": adjustments,
+            "important_notes": paystub.important_notes,
+            "footnotes": computed.get("footnotes", []) + list(paystub.footnotes),
+        }
+    )
+    return Paystub(**computed).model_dump(mode="json")
+
+
 def normalize_generation_plan(plan: dict | None) -> dict:
     raw = dict(plan or {})
     mode = str(raw.get("mode", "single") or "single").strip().lower()
@@ -363,11 +524,16 @@ def normalize_generation_plan(plan: dict | None) -> dict:
     if stub_count < 1 or stub_count > MAX_BATCH_STUBS:
         raise HTTPException(status_code=400, detail=f"Stub count must be between 1 and {MAX_BATCH_STUBS}.")
 
+    anchor = str(raw.get("anchor", "initial") or "initial").strip().lower()
+    if anchor not in GENERATION_ANCHORS:
+        raise HTTPException(status_code=400, detail=f"Unsupported schedule anchor: {anchor}")
+
     return {
         "mode": mode,
         "sequence_type": sequence_type,
         "stub_count": stub_count,
         "pay_frequency": _coerce_frequency(raw.get("pay_frequency")).value,
+        "anchor": anchor,
     }
 
 
@@ -377,23 +543,25 @@ def _increment_check_number(value: str, offset: int) -> str:
         return raw
     if raw.isdigit():
         return str(int(raw) + offset).zfill(len(raw))
-    return raw if offset == 0 else f"{raw}-{offset + 1}"
+    return raw if offset == 0 else f"{raw}{offset:+d}"
 
 
-def _sequence_periods_by_days(paystub: Paystub, count: int, step_days: int) -> list[dict]:
+def _sequence_periods_by_days(paystub: Paystub, count: int, step_days: int, anchor: str) -> list[dict]:
     start = _parse_iso_date(paystub.pay_period_start)
     end = _parse_iso_date(paystub.pay_period_end)
     pay_date = _parse_iso_date(paystub.pay_date)
     duration_days = (end - start).days
 
     periods: list[dict] = []
-    for offset in range(count):
+    starting_offset = -(count - 1) if anchor == "latest" else 0
+    for index in range(count):
+        offset = starting_offset + index
         shifted_start = start + timedelta(days=step_days * offset)
         shifted_end = shifted_start + timedelta(days=duration_days)
         shifted_pay_date = pay_date + timedelta(days=step_days * offset)
         periods.append(
             {
-                "sequence_number": offset + 1,
+                "sequence_number": index + 1,
                 "pay_period_start": _format_iso_date(shifted_start),
                 "pay_period_end": _format_iso_date(shifted_end),
                 "pay_date": _format_iso_date(shifted_pay_date),
@@ -403,7 +571,12 @@ def _sequence_periods_by_days(paystub: Paystub, count: int, step_days: int) -> l
     return periods
 
 
-def _sequence_periods_by_frequency(paystub: Paystub, count: int, frequency: PayFrequency) -> list[dict] | None:
+def _sequence_periods_by_frequency(
+    paystub: Paystub,
+    count: int,
+    frequency: PayFrequency,
+    anchor: str,
+) -> list[dict] | None:
     base_start = _parse_iso_date(paystub.pay_period_start)
     base_end = _parse_iso_date(paystub.pay_period_end)
     base_pay_date = _parse_iso_date(paystub.pay_date)
@@ -428,14 +601,24 @@ def _sequence_periods_by_frequency(paystub: Paystub, count: int, frequency: PayF
             if period.start == base_start and period.end == base_end:
                 matched_index = index
                 break
-    if matched_index is None or matched_index + count > len(candidates):
+    if matched_index is None:
+        return None
+
+    if anchor == "latest":
+        start_index = matched_index - count + 1
+        end_index = matched_index + 1
+    else:
+        start_index = matched_index
+        end_index = matched_index + count
+    if start_index < 0 or end_index > len(candidates):
         return None
 
     periods: list[dict] = []
-    for offset, period in enumerate(candidates[matched_index : matched_index + count]):
+    for index, period in enumerate(candidates[start_index:end_index]):
+        offset = (start_index + index) - matched_index
         periods.append(
             {
-                "sequence_number": offset + 1,
+                "sequence_number": index + 1,
                 "pay_period_start": _format_iso_date(period.start),
                 "pay_period_end": _format_iso_date(period.end),
                 "pay_date": _format_iso_date(period.pay_date),
@@ -449,6 +632,7 @@ def build_generation_schedule(payload: dict | Paystub, plan: dict | None = None)
     paystub = Paystub(**payload) if isinstance(payload, dict) else payload
     normalized_plan = normalize_generation_plan(plan)
     frequency = _coerce_frequency(normalized_plan["pay_frequency"])
+    anchor = normalized_plan["anchor"]
 
     if normalized_plan["mode"] == "single":
         periods = [
@@ -461,9 +645,9 @@ def build_generation_schedule(payload: dict | Paystub, plan: dict | None = None)
             }
         ]
     elif normalized_plan["sequence_type"] == "weekly":
-        periods = _sequence_periods_by_days(paystub, normalized_plan["stub_count"], 7)
+        periods = _sequence_periods_by_days(paystub, normalized_plan["stub_count"], 7, anchor)
     else:
-        periods = _sequence_periods_by_frequency(paystub, normalized_plan["stub_count"], frequency)
+        periods = _sequence_periods_by_frequency(paystub, normalized_plan["stub_count"], frequency, anchor)
         if periods is None:
             fallback_days = {
                 PayFrequency.WEEKLY: 7,
@@ -471,12 +655,13 @@ def build_generation_schedule(payload: dict | Paystub, plan: dict | None = None)
                 PayFrequency.SEMIMONTHLY: 15,
                 PayFrequency.MONTHLY: 30,
             }[frequency]
-            periods = _sequence_periods_by_days(paystub, normalized_plan["stub_count"], fallback_days)
+            periods = _sequence_periods_by_days(paystub, normalized_plan["stub_count"], fallback_days, anchor)
 
     summary = {
         "mode": normalized_plan["mode"],
         "sequence_type": normalized_plan["sequence_type"],
         "pay_frequency": frequency.value,
+        "anchor": anchor,
         "stub_count": len(periods),
         "first_pay_date": periods[0]["pay_date"],
         "last_pay_date": periods[-1]["pay_date"],
@@ -520,6 +705,18 @@ def _roll_stub_forward(paystub: Paystub, period: dict, offset: int) -> dict:
 def build_generation_sequence(payload: dict | Paystub, plan: dict | None = None) -> dict:
     paystub = Paystub(**payload) if isinstance(payload, dict) else payload
     schedule = build_generation_schedule(paystub, plan)
+    if _paystub_uses_automatic_builder(paystub):
+        paystubs: list[dict] = []
+        ytd_state = YTDState()
+        for period in schedule["periods"]:
+            computed = _compute_automatic_paystub(paystub, ytd_state=ytd_state, period=period)
+            paystubs.append(computed)
+            ytd_state.advance(computed)
+        return {
+            "schedule": schedule,
+            "paystubs": paystubs,
+        }
+
     paystubs = [
         _roll_stub_forward(paystub, period=period, offset=index)
         for index, period in enumerate(schedule["periods"])
@@ -559,7 +756,8 @@ def generate_pdf_document(
     template: PaystubTemplate | str = PaystubTemplate.DETACHED_CHECK,
     output_dir: Path | None = None,
 ) -> dict:
-    paystub = Paystub(**payload) if isinstance(payload, dict) else payload
+    normalized = normalize_paystub_payload(payload)
+    paystub = Paystub(**normalized)
     target_dir = output_dir or WEB_OUTPUT_DIR
     pdf_path = Path(
         generate_paystub_pdf(
@@ -975,6 +1173,7 @@ def build_bootstrap_payload() -> dict:
             "sequence_type": "pay_frequency",
             "stub_count": 1,
             "pay_frequency": sample_employee.frequency.value,
+            "anchor": "initial",
         },
         "templates": [
             {"value": template.value, "label": template.value.replace("_", " ").title()}

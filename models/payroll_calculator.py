@@ -1,12 +1,9 @@
 """
 Payroll calculation engine.
 
-Implements 2025/2026 IRS withholding tables (percentage method) plus
-FICA (Social Security + Medicare), and configurable state / local taxes.
-
-2026 federal brackets are estimated via ~2.8% COLA applied to the 2025 IRS
-Publication 15-T values. Update the bracket constants when the IRS publishes
-the official 2026 tables.
+Implements automatic withholding and deduction calculations for the supported
+paystub workflows, including FICA, federal/state income tax withholding, and
+state-specific payroll deductions used by the web app.
 """
 from __future__ import annotations
 
@@ -66,9 +63,9 @@ _FEDERAL_BRACKETS: dict[FilingStatus, list[tuple[float, float, float]]] = {
     ],
 }
 
-# FICA 2026 (SS wage base estimated at ~$181,000)
+# FICA 2026
 SS_RATE:             float = 0.0620
-SS_WAGE_BASE:        float = 181_000.0
+SS_WAGE_BASE:        float = 184_500.0
 MEDICARE_RATE:       float = 0.0145
 MEDICARE_ADDL_RATE:  float = 0.0090   # additional above threshold
 MEDICARE_ADDL_THRESHOLD: dict[FilingStatus, float] = {
@@ -102,6 +99,9 @@ _NY_STD_DEDUCTION: dict[FilingStatus, float] = {
     FilingStatus.MARRIED:           16_050,
     FilingStatus.HEAD_OF_HOUSEHOLD: 11_200,
 }
+
+NY_PFL_RATE: float = 0.00432
+NY_PFL_ANNUAL_CAP: float = 411.91
 
 # Approximate effective state tax rates for states without bracket tables here.
 # Use these as fallback when state_tax_rate is not explicitly provided.
@@ -217,6 +217,15 @@ def compute_state_tax(
     return round(gross_period * rate, 2)
 
 
+def compute_ny_paid_family_leave(gross_period: float, ytd_before: float) -> float:
+    """New York Paid Family Leave employee contribution."""
+    if ytd_before >= NY_PFL_ANNUAL_CAP:
+        return 0.0
+    contribution = round(gross_period * NY_PFL_RATE, 2)
+    remaining_cap = max(0.0, round(NY_PFL_ANNUAL_CAP - ytd_before, 2))
+    return round(min(contribution, remaining_cap), 2)
+
+
 # ── Data classes ──────────────────────────────────────────────────────────────
 
 @dataclass
@@ -279,6 +288,7 @@ class EmployeePayConfig:
     state_tax_rate_override: float | None = None   # None = use built-in tables
     local_tax_rate:   float = 0.0                  # e.g. 0.03876 for NYC
     local_tax_label:  str   = ""
+    apply_ny_paid_family_leave: bool = True
 
     # Earnings and deductions
     earnings:            List[EarningLine]  = field(default_factory=list)
@@ -437,6 +447,16 @@ def compute_paystub_data(
             "ytd":     ytd.deductions.get(d.label, 0.0) + d.amount,
         })
 
+    if config.state.upper() == "NY" and config.apply_ny_paid_family_leave:
+        prior_pfl = ytd.deductions.get("NY Paid Family Leave", 0.0)
+        pfl_current = compute_ny_paid_family_leave(gross_current, prior_pfl)
+        if pfl_current:
+            deductions.append({
+                "label": "NY Paid Family Leave",
+                "current": pfl_current,
+                "ytd": round(prior_pfl + pfl_current, 2),
+            })
+
     # ── Totals ────────────────────────────────────────────────────────────────
     total_taxes_current      = round(sum(t["current"] for t in taxes), 2)
     total_deductions_current = round(sum(d["current"] for d in deductions), 2)
@@ -465,6 +485,8 @@ def compute_paystub_data(
         "* Excluded from federal taxable wages",
         f"Your federal wages this period are ${federal_taxable:,.2f}",
     ]
+    if config.state.upper() == "NY" and config.apply_ny_paid_family_leave:
+        footnotes.append("NY Paid Family Leave is withheld automatically based on current New York employee rates.")
 
     return {
         # Employer / employee identity

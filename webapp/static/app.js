@@ -1,11 +1,10 @@
 const DRAFT_KEY = "paystub-studio-draft-v2";
 
 const SECTION_CONFIG = {
-  earnings: [["label", "Label", "text"], ["rate", "Rate", "number"], ["hours", "Hours", "number"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
-  taxes: [["label", "Label", "text"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
-  deductions: [["label", "Label", "text"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
-  adjustments: [["label", "Label", "text"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
-  other_benefits: [["label", "Label", "text"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
+  source_earnings: [["label", "Label", "select"], ["rate", "Rate", "number"], ["hours", "Hours", "number"], ["amount", "Flat amount", "number"]],
+  source_deductions: [["label", "Label", "select"], ["amount", "Amount", "number"], ["is_pretax", "Pre-tax", "checkbox"]],
+  adjustments: [["label", "Label", "select"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
+  other_benefits: [["label", "Label", "select"], ["current", "Current", "number"], ["ytd", "YTD", "number"]],
 };
 
 const FIELD_LABELS = {
@@ -13,6 +12,9 @@ const FIELD_LABELS = {
   company_address: "Company address",
   employee_name: "Employee name",
   employee_id: "Employee ID",
+  taxable_marital_status: "Tax filing status",
+  work_state: "Work state",
+  pay_frequency: "Pay frequency",
   pay_period_start: "Pay period start",
   pay_period_end: "Pay period end",
   pay_date: "Pay date",
@@ -34,6 +36,30 @@ const PROFILE_TYPE_LABELS = {
 
 const FILING_STATUS_OPTIONS = ["Single", "Married", "Head of Household"];
 const FREQUENCY_OPTIONS = ["weekly", "biweekly", "semimonthly", "monthly"];
+const COMPENSATION_OPTIONS = ["hourly", "salary"];
+const GUIDED_DRAFT_FIELDS = new Set([
+  "taxable_marital_status",
+  "work_state",
+  "pay_frequency",
+  "allowances_count",
+  "additional_federal_withholding",
+  "compensation_type",
+  "primary_earning_label",
+  "annual_salary",
+  "hourly_rate",
+  "regular_hours",
+]);
+const STATE_OPTIONS = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+];
+const EARNING_LABEL_OPTIONS = ["Regular", "Overtime", "Double Time", "Bonus", "Commission", "Holiday", "Sick", "PTO", "Reimbursement"];
+const DEDUCTION_LABEL_OPTIONS = ["401(k)", "HSA", "FSA", "Health Insurance", "Dental Insurance", "Vision Insurance", "Union Dues", "Wage Garnishment", "Child Support", "Loan Repayment", "Transit", "Parking"];
+const ADJUSTMENT_LABEL_OPTIONS = ["Reimbursement", "Correction", "Advance Repayment", "Uniform", "Travel", "Meal", "Miscellaneous"];
+const BENEFIT_LABEL_OPTIONS = ["PTO Balance", "Sick Balance", "Vacation Balance", "Employer HSA", "Employer 401(k)", "Life Insurance", "Wellness"];
 
 const state = {
   emptyPaystub: null,
@@ -44,6 +70,7 @@ const state = {
   generationSequenceType: "pay_frequency",
   generationPayFrequency: "biweekly",
   generationStubCount: 1,
+  generationAnchor: "initial",
   preview: null,
   previewStale: false,
   working: "",
@@ -115,6 +142,7 @@ function cache() {
   els.generationSequenceType = document.getElementById("generation_sequence_type");
   els.generationPayFrequency = document.getElementById("generation_pay_frequency");
   els.generationStubCount = document.getElementById("generation_stub_count");
+  els.generationAnchor = document.getElementById("generation_anchor");
   els.generationPlanSummary = document.getElementById("generation-plan-summary");
   els.profileSummary = document.getElementById("profile-summary");
   els.assignmentSelect = document.getElementById("assignment-select");
@@ -133,14 +161,16 @@ function cache() {
   els.newProfileButton = document.getElementById("new-profile-button");
   els.loadProfileButton = document.getElementById("load-profile-button");
   els.saveProfileButton = document.getElementById("save-profile-button");
+  els.saveCompanyProfileButton = document.getElementById("save-company-profile-button");
+  els.saveEmployeeProfileButton = document.getElementById("save-employee-profile-button");
   els.profileEditorStatus = document.getElementById("profile-editor-status");
   els.profileFormShell = document.getElementById("profile-form-shell");
   els.profileJsonEditor = document.getElementById("profile-json-editor");
   els.applyProfileJsonButton = document.getElementById("apply-profile-json-button");
   els.repeaters = {
-    earnings: document.getElementById("earnings-list"),
+    source_earnings: document.getElementById("earnings-list"),
     taxes: document.getElementById("taxes-list"),
-    deductions: document.getElementById("deductions-list"),
+    source_deductions: document.getElementById("deductions-list"),
     adjustments: document.getElementById("adjustments-list"),
     other_benefits: document.getElementById("other_benefits-list"),
   };
@@ -174,7 +204,7 @@ function bind() {
     persistDraft();
   });
 
-  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount].forEach((field) => {
+  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor].forEach((field) => {
     field.addEventListener("change", handleGenerationInput);
     field.addEventListener("input", handleGenerationInput);
   });
@@ -234,6 +264,14 @@ function bind() {
 
   els.saveProfileButton.addEventListener("click", async () => {
     await saveProfileRecord();
+  });
+
+  els.saveCompanyProfileButton?.addEventListener("click", async () => {
+    await saveCurrentCompanyProfile();
+  });
+
+  els.saveEmployeeProfileButton?.addEventListener("click", async () => {
+    await saveCurrentEmployeeProfile();
   });
 
   els.profileJsonEditor.addEventListener("input", () => {
@@ -321,6 +359,8 @@ function applyBootstrap(bootstrap, { preserveDraft = false } = {}) {
   els.profileTypeSelect.innerHTML = Object.entries(PROFILE_TYPE_LABELS)
     .map(([value, label]) => `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`)
     .join("");
+  document.getElementById("work_state").innerHTML = buildSimpleOptions(STATE_OPTIONS);
+  document.getElementById("primary_earning_label").innerHTML = buildSimpleOptions(EARNING_LABEL_OPTIONS);
   updateImportControls();
 }
 
@@ -345,6 +385,7 @@ function restoreDraft() {
     state.generationSequenceType = parsed.generationSequenceType || state.generationSequenceType;
     state.generationPayFrequency = parsed.generationPayFrequency || state.generationPayFrequency;
     state.generationStubCount = Number(parsed.generationStubCount || state.generationStubCount);
+    state.generationAnchor = parsed.generationAnchor || state.generationAnchor;
     setDraftStatus("Restored your last local draft.");
   } catch {
     state.paystub = structuredClone(state.samplePaystub);
@@ -353,6 +394,10 @@ function restoreDraft() {
 
 function ensureDefaultSelections() {
   if (!state.paystub) state.paystub = structuredClone(state.samplePaystub);
+  state.paystub.source_earnings = state.paystub.source_earnings || [];
+  state.paystub.source_deductions = state.paystub.source_deductions || [];
+  state.paystub.adjustments = state.paystub.adjustments || [];
+  state.paystub.other_benefits = state.paystub.other_benefits || [];
   if (!state.assignmentId && state.assignmentOptions.length) {
     state.assignmentId = state.assignmentOptions[0].value;
   }
@@ -370,6 +415,9 @@ function ensureDefaultSelections() {
   if (!["pay_frequency", "weekly"].includes(state.generationSequenceType)) {
     state.generationSequenceType = "pay_frequency";
   }
+  if (!["initial", "latest"].includes(state.generationAnchor)) {
+    state.generationAnchor = "initial";
+  }
   if (!Number.isFinite(state.generationStubCount) || state.generationStubCount < 1) {
     state.generationStubCount = 1;
   }
@@ -383,12 +431,14 @@ function applyGenerationPlanDefaults(plan = {}) {
   state.generationSequenceType = plan.sequence_type || "pay_frequency";
   state.generationPayFrequency = plan.pay_frequency || "biweekly";
   state.generationStubCount = Number(plan.stub_count || 1);
+  state.generationAnchor = plan.anchor || "initial";
 }
 
 function resetGenerationPlan() {
   state.generationMode = "single";
   state.generationSequenceType = "pay_frequency";
   state.generationStubCount = 1;
+  state.generationAnchor = "initial";
   syncGenerationFrequencyFromAssignment({ force: false });
 }
 
@@ -409,6 +459,7 @@ function handleGenerationInput() {
   state.generationSequenceType = els.generationSequenceType.value;
   state.generationPayFrequency = els.generationPayFrequency.value;
   state.generationStubCount = Math.max(1, Math.min(26, Number(els.generationStubCount.value || 1)));
+  state.generationAnchor = els.generationAnchor.value;
   if (state.generationMode === "single") {
     state.generationStubCount = 1;
   }
@@ -425,6 +476,7 @@ function buildGenerationPlan() {
     sequence_type: state.generationSequenceType,
     pay_frequency: state.generationSequenceType === "weekly" ? "weekly" : state.generationPayFrequency,
     stub_count: state.generationMode === "multiple" ? state.generationStubCount : 1,
+    anchor: state.generationAnchor,
   };
 }
 
@@ -433,12 +485,28 @@ function handleInput(event) {
   if (!(target instanceof HTMLElement) || !state.paystub) return;
   const { section, index, prop, type } = target.dataset;
   if (section && index !== undefined && prop) {
-    state.paystub[section][Number(index)][prop] = type === "number" ? numberValue(target.value) : target.value;
+    if (section === "source_earnings" || section === "source_deductions") {
+      state.paystub.draft_mode = true;
+    }
+    if (type === "number") {
+      state.paystub[section][Number(index)][prop] = numberValue(target.value);
+    } else if (type === "checkbox") {
+      state.paystub[section][Number(index)][prop] = Boolean(target.checked);
+    } else {
+      state.paystub[section][Number(index)][prop] = target.value;
+    }
     clearFieldError(`${section}.${index}.${prop}`);
     clearFieldError(section);
   } else if (target.name) {
+    if (GUIDED_DRAFT_FIELDS.has(target.name)) {
+      state.paystub.draft_mode = true;
+    }
     if (target.name === "important_notes" || target.name === "footnotes") {
       state.paystub[target.name] = splitLines(target.value);
+    } else if (target instanceof HTMLInputElement && target.type === "number") {
+      state.paystub[target.name] = numberValue(target.value);
+    } else if (target instanceof HTMLInputElement && target.type === "checkbox") {
+      state.paystub[target.name] = target.checked;
     } else {
       state.paystub[target.name] = target.value;
     }
@@ -821,16 +889,23 @@ function renderForm() {
     "employee_name",
     "employee_address",
     "employee_id",
+    "work_state",
+    "pay_frequency",
     "pay_date",
     "pay_period_start",
     "pay_period_end",
     "social_security_number",
     "taxable_marital_status",
-    "exemptions_allowances",
     "payroll_check_number",
+    "compensation_type",
+    "primary_earning_label",
   ].forEach((name) => {
     const field = document.getElementById(name);
     if (field) field.value = state.paystub[name] || "";
+  });
+  ["allowances_count", "additional_federal_withholding", "annual_salary", "hourly_rate", "regular_hours"].forEach((name) => {
+    const field = document.getElementById(name);
+    if (field) field.value = String(state.paystub[name] ?? 0);
   });
   document.getElementById("important_notes").value = (state.paystub.important_notes || []).join("\n");
   document.getElementById("footnotes").value = (state.paystub.footnotes || []).join("\n");
@@ -838,9 +913,11 @@ function renderForm() {
   els.generationMode.value = state.generationMode;
   els.generationSequenceType.value = state.generationSequenceType;
   els.generationPayFrequency.value = state.generationSequenceType === "weekly" ? "weekly" : state.generationPayFrequency;
+  els.generationAnchor.value = state.generationAnchor;
   els.generationPayFrequency.disabled = state.generationMode === "single" || state.generationSequenceType === "weekly";
   els.generationStubCount.value = String(state.generationMode === "multiple" ? state.generationStubCount : 1);
   els.generationStubCount.disabled = state.generationMode === "single";
+  els.generationAnchor.disabled = state.generationMode === "single";
   els.generateButton.textContent = state.generationMode === "multiple" ? "Generate Batch ZIP" : "Generate PDF";
   document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-frequency-field")?.toggleAttribute(
@@ -848,7 +925,13 @@ function renderForm() {
     state.generationMode === "single" || state.generationSequenceType === "weekly"
   );
   document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  document.getElementById("generation-anchor-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  document.getElementById("annual_salary")?.toggleAttribute("disabled", state.paystub.compensation_type !== "salary");
+  document.getElementById("hourly_rate")?.toggleAttribute("disabled", state.paystub.compensation_type === "salary");
+  document.getElementById("regular_hours")?.toggleAttribute("disabled", state.paystub.compensation_type === "salary");
   renderGenerationPlanSummary();
+
+  renderComputedTaxLines();
 
   Object.entries(SECTION_CONFIG).forEach(([section, fields]) => {
     const container = els.repeaters[section];
@@ -871,6 +954,43 @@ function renderForm() {
                 .map(([key, label, type]) => {
                   const fieldKey = `${section}.${index}.${key}`;
                   const inputId = `${section}-${index}-${key}`;
+                  const options = optionsForField(section, key);
+                  if (type === "checkbox") {
+                    return `
+                      <label class="field field-inline">
+                        <span>${label}</span>
+                        <input
+                          id="${inputId}"
+                          type="checkbox"
+                          data-section="${section}"
+                          data-index="${index}"
+                          data-prop="${key}"
+                          data-type="${type}"
+                          aria-describedby="${inputId}-error"
+                          ${row[key] ? "checked" : ""}
+                        />
+                        <small id="${inputId}-error" class="field-error row-error" data-for="${fieldKey}" role="alert" aria-live="polite"></small>
+                      </label>
+                    `;
+                  }
+                  if (type === "select") {
+                    return `
+                      <label class="field field-inline">
+                        <span>${label}</span>
+                        <select
+                          id="${inputId}"
+                          data-section="${section}"
+                          data-index="${index}"
+                          data-prop="${key}"
+                          data-type="${type}"
+                          aria-describedby="${inputId}-error"
+                        >
+                          ${buildSimpleOptions(options, row[key] || "")}
+                        </select>
+                        <small id="${inputId}-error" class="field-error row-error" data-for="${fieldKey}" role="alert" aria-live="polite"></small>
+                      </label>
+                    `;
+                  }
                   return `
                     <label class="field field-inline">
                       <span>${label}</span>
@@ -912,6 +1032,7 @@ function renderGenerationPlanSummary() {
   const frequencyLabel = state.generationSequenceType === "weekly"
     ? "Weekly"
     : state.generationPayFrequency.replace("semi", "semi-").replace(/\b\w/g, (char) => char.toUpperCase());
+  const anchorLabel = state.generationAnchor === "latest" ? "Latest stub" : "Initial stub";
 
   const rows = (plan?.entries || [])
     .slice(0, 6)
@@ -943,6 +1064,10 @@ function renderGenerationPlanSummary() {
           <span>Count</span>
           <strong>${escapeHtml(String(state.generationStubCount))}</strong>
         </div>
+        <div class="generation-summary-row">
+          <span>Anchor</span>
+          <strong>${escapeHtml(anchorLabel)}</strong>
+        </div>
         ${rows || `<div class="generation-summary-row"><span>Schedule</span><strong>Preview needed</strong></div>`}
       </div>
     </div>
@@ -950,8 +1075,18 @@ function renderGenerationPlanSummary() {
 }
 
 function addRow(section) {
-  const row = section === "earnings" ? { label: "", rate: 0, hours: 0, current: 0, ytd: 0 } : { label: "", current: 0, ytd: 0 };
+  const defaults = {
+    source_earnings: { label: "Overtime", rate: 0, hours: 0, amount: 0 },
+    source_deductions: { label: "401(k)", amount: 0, is_pretax: true },
+    adjustments: { label: "Reimbursement", current: 0, ytd: 0 },
+    other_benefits: { label: "PTO Balance", current: 0, ytd: 0 },
+  };
+  const row = defaults[section];
+  if (!row) return;
   state.paystub[section].push(row);
+  if (section === "source_earnings" || section === "source_deductions") {
+    state.paystub.draft_mode = true;
+  }
   state.previewStale = Boolean(state.preview);
   renderForm();
   persistDraft();
@@ -1222,9 +1357,28 @@ function validate() {
     });
   });
 
-  const earnings = (state.paystub.earnings || []).filter((row) => !isBlankRow("earnings", row));
-  if (!earnings.length || !earnings.some((item) => String(item.label || "").trim())) {
-    errors.earnings = "Add at least one earning line with a label.";
+  if (state.paystub.draft_mode) {
+    if (state.paystub.compensation_type === "salary") {
+      if (numberValue(state.paystub.annual_salary) <= 0) {
+        errors.annual_salary = "Enter the annual salary.";
+      }
+    } else {
+      if (numberValue(state.paystub.hourly_rate) <= 0) {
+        errors.hourly_rate = "Enter the hourly rate.";
+      }
+      if (numberValue(state.paystub.regular_hours) <= 0) {
+        errors.regular_hours = "Enter the regular hours for this pay period.";
+      }
+    }
+
+    const earnings = (state.paystub.source_earnings || []).filter((row) => !isBlankRow("source_earnings", row));
+    if (
+      state.paystub.compensation_type === "hourly" &&
+      numberValue(state.paystub.hourly_rate) <= 0 &&
+      !earnings.length
+    ) {
+      errors.earnings = "Add regular pay or an earning line before previewing.";
+    }
   }
 
   if (state.generationMode === "multiple") {
@@ -1354,17 +1508,26 @@ function renderPreview() {
 
 function buildSubmissionPaystub() {
   const paystub = structuredClone(state.paystub);
+  paystub.draft_mode = Boolean(state.paystub.draft_mode);
   Object.keys(SECTION_CONFIG).forEach((section) => {
     paystub[section] = (paystub[section] || []).filter((row) => !isBlankRow(section, row));
   });
+  if (paystub.draft_mode) {
+    paystub.taxes = [];
+    paystub.earnings = [];
+    paystub.deductions = [];
+  }
   return paystub;
 }
 
 function isBlankRow(section, row) {
-  return SECTION_CONFIG[section].every(([key, , type]) => {
-    if (type === "text") return !String(row[key] || "").trim();
-    return Number(row[key] || 0) === 0;
-  });
+  if (section === "source_deductions") {
+    return Number(row.amount || 0) === 0;
+  }
+  if (section === "source_earnings") {
+    return Number(row.rate || 0) === 0 && Number(row.hours || 0) === 0 && Number(row.amount || 0) === 0;
+  }
+  return Number(row.current || 0) === 0 && Number(row.ytd || 0) === 0;
 }
 
 function persistDraft() {
@@ -1384,6 +1547,7 @@ function persistDraft() {
       generationSequenceType: state.generationSequenceType,
       generationPayFrequency: state.generationPayFrequency,
       generationStubCount: state.generationStubCount,
+      generationAnchor: state.generationAnchor,
     })
   );
   setDraftStatus("Draft saved locally.");
@@ -1406,6 +1570,8 @@ function setWorking(mode) {
     els.newProfileButton,
     els.loadProfileButton,
     els.saveProfileButton,
+    els.saveCompanyProfileButton,
+    els.saveEmployeeProfileButton,
     els.applyProfileJsonButton,
   ];
   allButtons.forEach((button) => {
@@ -1418,6 +1584,7 @@ function setWorking(mode) {
   els.generationSequenceType.disabled = true;
   els.generationPayFrequency.disabled = true;
   els.generationStubCount.disabled = true;
+  els.generationAnchor.disabled = true;
   els.exportFormat.disabled = true;
   els.importFormat.disabled = true;
   els.importFile.disabled = true;
@@ -1453,6 +1620,8 @@ function clearWorking() {
     els.newProfileButton,
     els.loadProfileButton,
     els.saveProfileButton,
+    els.saveCompanyProfileButton,
+    els.saveEmployeeProfileButton,
     els.applyProfileJsonButton,
   ].forEach((button) => {
     if (button) button.disabled = false;
@@ -1463,6 +1632,7 @@ function clearWorking() {
   els.generationSequenceType.disabled = false;
   els.generationPayFrequency.disabled = state.generationMode === "single" || state.generationSequenceType === "weekly";
   els.generationStubCount.disabled = state.generationMode === "single";
+  els.generationAnchor.disabled = state.generationMode === "single";
   els.exportFormat.disabled = false;
   els.importFormat.disabled = false;
   els.importFile.disabled = false;
@@ -1526,6 +1696,134 @@ function table(title, headers, rows) {
       </table>
     </div>
   `;
+}
+
+function optionsForField(section, key) {
+  if (key !== "label") return [];
+  if (section === "source_earnings") return EARNING_LABEL_OPTIONS;
+  if (section === "source_deductions") return DEDUCTION_LABEL_OPTIONS;
+  if (section === "adjustments") return ADJUSTMENT_LABEL_OPTIONS;
+  if (section === "other_benefits") return BENEFIT_LABEL_OPTIONS;
+  return [];
+}
+
+function buildSimpleOptions(options, selected = "") {
+  return (options || [])
+    .map((option) => {
+      const isSelected = String(option) === String(selected) ? ' selected' : "";
+      return `<option value="${escapeHtml(option)}"${isSelected}>${escapeHtml(option)}</option>`;
+    })
+    .join("");
+}
+
+function renderComputedTaxLines() {
+  const rows = state.paystub?.taxes || [];
+  if (!rows.length) {
+    els.repeaters.taxes.innerHTML = `<div class="repeater-empty">${els.repeaters.taxes.dataset.emptyLabel}</div>`;
+    return;
+  }
+  els.repeaters.taxes.innerHTML = rows
+    .map(
+      (row) => `
+        <div class="line-item">
+          <div class="line-item-head">
+            <span class="line-item-title">${escapeHtml(row.label || "Tax")}</span>
+          </div>
+          <div class="line-item-grid is-compact">
+            <label class="field field-inline">
+              <span>Current</span>
+              <input type="text" value="${escapeHtml(currency(row.current))}" readonly />
+            </label>
+            <label class="field field-inline">
+              <span>YTD</span>
+              <input type="text" value="${escapeHtml(currency(row.ytd))}" readonly />
+            </label>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function slugify(value, fallback) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || fallback;
+}
+
+async function saveCurrentCompanyProfile() {
+  const record = {
+    profile_id: slugify(state.paystub.company_name, "company_profile"),
+    company_name: state.paystub.company_name || "",
+    company_address: state.paystub.company_address || "",
+    default_payroll_check_number: state.paystub.payroll_check_number || "000000001",
+  };
+  setWorking("profile");
+  try {
+    const response = await api("/api/profiles/company", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ record }),
+    });
+    state.profileCatalog = response.profile_catalog || state.profileCatalog;
+    state.profileSummary = response.profile_summary || state.profileSummary;
+    state.assignmentOptions = response.assignment_options || state.assignmentOptions;
+    renderProfileControls();
+    showMessage(`Saved company profile ${escapeHtml(record.profile_id)}.`, "success");
+  } catch (error) {
+    showMessage(formatError(error), "error");
+  } finally {
+    clearWorking();
+  }
+}
+
+async function saveCurrentEmployeeProfile() {
+  const payPeriodsPerYear = {
+    weekly: 52,
+    biweekly: 26,
+    semimonthly: 24,
+    monthly: 12,
+  }[state.paystub.pay_frequency || "biweekly"] || 26;
+  const regularLine =
+    state.paystub.compensation_type === "salary"
+      ? { label: state.paystub.primary_earning_label || "Regular", flat_amount: numberValue(state.paystub.annual_salary) / payPeriodsPerYear }
+      : { label: state.paystub.primary_earning_label || "Regular", rate: numberValue(state.paystub.hourly_rate), hours: numberValue(state.paystub.regular_hours), flat_amount: 0 };
+  const earnings = [regularLine, ...(state.paystub.source_earnings || []).map((item) => ({
+    label: item.label,
+    rate: numberValue(item.rate),
+    hours: numberValue(item.hours),
+    flat_amount: numberValue(item.amount),
+  }))].filter((item) => String(item.label || "").trim());
+  const record = {
+    profile_id: slugify(state.paystub.employee_name, "employee_profile"),
+    employee_id: state.paystub.employee_id || "",
+    employee_name: state.paystub.employee_name || "",
+    employee_address: state.paystub.employee_address || "",
+    social_security_number: state.paystub.social_security_number || "",
+    earnings,
+    other_benefits: state.paystub.other_benefits || [],
+    important_notes: state.paystub.important_notes || [],
+  };
+  setWorking("profile");
+  try {
+    const response = await api("/api/profiles/employee", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ record }),
+    });
+    state.profileCatalog = response.profile_catalog || state.profileCatalog;
+    state.profileSummary = response.profile_summary || state.profileSummary;
+    state.assignmentOptions = response.assignment_options || state.assignmentOptions;
+    renderProfileControls();
+    showMessage(`Saved employee profile ${escapeHtml(record.profile_id)}.`, "success");
+  } catch (error) {
+    showMessage(formatError(error), "error");
+  } finally {
+    clearWorking();
+  }
 }
 
 function buildFormatOptions(formats) {

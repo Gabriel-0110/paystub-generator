@@ -144,13 +144,29 @@
                   <small class="field-hint">Generate a single pay period or a custom selected number of weeks or pay periods.</small>
                   <small id="generation_stub_count-error" class="field-error" data-for="generation_stub_count" role="alert" aria-live="polite"></small>
                 </label>
+                <label id="generation-anchor-field" class="field compact-field">
+                  <span>Anchor date</span>
+                  <select id="generation_anchor" name="generation_anchor" aria-label="Generation anchor">
+                    <option value="initial">Selected date is the first stub</option>
+                    <option value="latest">Selected date is the latest stub</option>
+                  </select>
+                  <small class="field-hint">Use the selected pay period as the start or end of the generated sequence.</small>
+                </label>
               </div>
               <div id="generation-plan-summary" class="generation-plan-summary" aria-live="polite"></div>
             </fieldset>
 
             <fieldset class="form-section">
               <legend>Step 2 · Company and employee</legend>
-              <p class="step-copy">Enter who is paying and who is being paid.</p>
+              <div class="workflow-card-head">
+                <div>
+                  <p class="step-copy">Enter who is paying and who is being paid.</p>
+                </div>
+                <div class="inline-actions">
+                  <button id="save-company-profile-button" type="button" class="ghost-button">Save company profile</button>
+                  <button id="save-employee-profile-button" type="button" class="ghost-button">Save employee profile</button>
+                </div>
+              </div>
               <div class="section-grid two-up">
                 <label class="field">
                   <span>Company name</span>
@@ -197,14 +213,29 @@
                 </label>
                 <div class="section-grid nested-grid">
                   <label class="field">
-                    <span>Taxable marital status</span>
-                    <input id="taxable_marital_status" name="taxable_marital_status" aria-describedby="taxable_marital_status-error" />
+                    <span>Tax filing status</span>
+                    <select id="taxable_marital_status" name="taxable_marital_status" aria-describedby="taxable_marital_status-error">
+                      <option value="Single">Single</option>
+                      <option value="Married">Married</option>
+                      <option value="Head of Household">Head of Household</option>
+                    </select>
                     <small id="taxable_marital_status-error" class="field-error" data-for="taxable_marital_status" role="alert" aria-live="polite"></small>
                   </label>
                   <label class="field">
-                    <span>Exemptions or allowances</span>
-                    <input id="exemptions_allowances" name="exemptions_allowances" aria-describedby="exemptions_allowances-error" />
-                    <small id="exemptions_allowances-error" class="field-error" data-for="exemptions_allowances" role="alert" aria-live="polite"></small>
+                    <span>Work state</span>
+                    <select id="work_state" name="work_state" aria-describedby="work_state-error"></select>
+                    <small class="field-hint">State withholding and required employee deductions update automatically.</small>
+                    <small id="work_state-error" class="field-error" data-for="work_state" role="alert" aria-live="polite"></small>
+                  </label>
+                  <label class="field">
+                    <span>Allowances</span>
+                    <input id="allowances_count" name="allowances_count" type="number" min="0" step="1" inputmode="numeric" aria-describedby="allowances_count-error" />
+                    <small id="allowances_count-error" class="field-error" data-for="allowances_count" role="alert" aria-live="polite"></small>
+                  </label>
+                  <label class="field">
+                    <span>Additional federal withholding</span>
+                    <input id="additional_federal_withholding" name="additional_federal_withholding" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="additional_federal_withholding-error" />
+                    <small id="additional_federal_withholding-error" class="field-error" data-for="additional_federal_withholding" role="alert" aria-live="polite"></small>
                   </label>
                 </div>
               </div>
@@ -212,8 +243,18 @@
 
             <fieldset class="form-section">
               <legend>Step 3 · Pay schedule</legend>
-              <p class="step-copy">Set the pay period and the date the employee is paid.</p>
+              <p class="step-copy">Set the pay frequency, the pay period, and whether the selected date is the first or latest stub in the sequence.</p>
               <div class="section-grid three-up">
+                <label class="field">
+                  <span>Pay frequency</span>
+                  <select id="pay_frequency" name="pay_frequency" aria-describedby="pay_frequency-error">
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Biweekly</option>
+                    <option value="semimonthly">Semi-monthly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <small id="pay_frequency-error" class="field-error" data-for="pay_frequency" role="alert" aria-live="polite"></small>
+                </label>
                 <label class="field">
                   <span>Pay period start</span>
                   <input id="pay_period_start" name="pay_period_start" type="date" aria-describedby="pay_period_start-error" required />
@@ -236,11 +277,43 @@
               <div class="repeater-head">
                 <div>
                   <h3>Step 4 · Earnings</h3>
-                  <p>Add the earnings lines that make up gross pay for this stub.</p>
+                  <p>Choose salary or hourly pay for the regular line, then add any extra earnings such as overtime, bonus, or holiday pay.</p>
                 </div>
-                <button type="button" class="ghost-button" data-action="add-row" data-section="earnings">Add earning</button>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="source_earnings">Add extra earning</button>
               </div>
-              <div id="earnings-list" class="repeater-list" data-empty-label="No earnings lines yet. Add an earning to calculate gross pay."></div>
+              <div class="section-grid three-up">
+                <label class="field">
+                  <span>Compensation type</span>
+                  <select id="compensation_type" name="compensation_type" aria-describedby="compensation_type-error">
+                    <option value="hourly">Hourly</option>
+                    <option value="salary">Salary</option>
+                  </select>
+                  <small id="compensation_type-error" class="field-error" data-for="compensation_type" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Regular label</span>
+                  <select id="primary_earning_label" name="primary_earning_label" aria-describedby="primary_earning_label-error"></select>
+                  <small id="primary_earning_label-error" class="field-error" data-for="primary_earning_label" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Annual salary</span>
+                  <input id="annual_salary" name="annual_salary" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="annual_salary-error" />
+                  <small class="field-hint">Used only when compensation type is salary.</small>
+                  <small id="annual_salary-error" class="field-error" data-for="annual_salary" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Hourly rate</span>
+                  <input id="hourly_rate" name="hourly_rate" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="hourly_rate-error" />
+                  <small class="field-hint">Used only when compensation type is hourly.</small>
+                  <small id="hourly_rate-error" class="field-error" data-for="hourly_rate" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Regular hours</span>
+                  <input id="regular_hours" name="regular_hours" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="regular_hours-error" />
+                  <small id="regular_hours-error" class="field-error" data-for="regular_hours" role="alert" aria-live="polite"></small>
+                </label>
+              </div>
+              <div id="earnings-list" class="repeater-list" data-empty-label="No extra earnings yet. Add overtime, bonus, commission, or similar lines if needed."></div>
               <small id="earnings-error" class="field-error" data-for="earnings" role="alert" aria-live="polite"></small>
             </section>
 
@@ -248,22 +321,21 @@
               <div class="repeater-head">
                 <div>
                   <h3>Step 5 · Taxes</h3>
-                  <p>List withholding lines for the current period and year-to-date totals.</p>
+                  <p>Federal, FICA, and state taxes are calculated automatically from the pay setup above.</p>
                 </div>
-                <button type="button" class="ghost-button" data-action="add-row" data-section="taxes">Add tax</button>
               </div>
-              <div id="taxes-list" class="repeater-list" data-empty-label="No tax lines added. This section can stay empty for manual draft work."></div>
+              <div id="taxes-list" class="repeater-list" data-empty-label="Taxes will appear here after you refresh the preview."></div>
             </section>
 
             <section class="repeater-section">
               <div class="repeater-head">
                 <div>
                   <h3>Step 6 · Deductions</h3>
-                  <p>Use deductions for employee-paid items such as insurance, retirement, or other withholdings.</p>
+                  <p>Required New York deductions are added automatically when applicable. Add any extra employee deductions below.</p>
                 </div>
-                <button type="button" class="ghost-button" data-action="add-row" data-section="deductions">Add deduction</button>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="source_deductions">Add deduction</button>
               </div>
-              <div id="deductions-list" class="repeater-list" data-empty-label="No deductions added yet."></div>
+              <div id="deductions-list" class="repeater-list" data-empty-label="No extra deductions added yet."></div>
             </section>
 
             <section class="repeater-section">

@@ -36,3 +36,6 @@ tmp_io_cli/
 .DS_Store
 Thumbs.db
 *.log
+
+# Workspace files
+.paystub-generator-code.code-workspace

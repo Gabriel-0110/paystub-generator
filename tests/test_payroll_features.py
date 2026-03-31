@@ -172,6 +172,27 @@ class YTDEngineTests(unittest.TestCase):
         self.assertEqual(schedule["periods"][1]["pay_period_start"], "2026-01-17")
         self.assertEqual(schedule["periods"][2]["pay_date"], "2026-02-20")
 
+    def test_weekly_generation_uses_seven_day_spacing(self) -> None:
+        paystub = build_sample_paystub_data()
+        paystub["pay_period_start"] = "2026-01-03"
+        paystub["pay_period_end"] = "2026-01-09"
+        paystub["pay_date"] = "2026-01-10"
+
+        schedule = web_service.build_generation_schedule(
+            paystub,
+            {
+                "mode": "multiple",
+                "sequence_type": "weekly",
+                "pay_frequency": "weekly",
+                "stub_count": 3,
+            },
+        )
+
+        self.assertEqual(schedule["periods"][0]["pay_period_start"], "2026-01-03")
+        self.assertEqual(schedule["periods"][1]["pay_period_start"], "2026-01-10")
+        self.assertEqual(schedule["periods"][2]["pay_period_start"], "2026-01-17")
+        self.assertEqual(schedule["periods"][1]["pay_date"], "2026-01-17")
+
     def test_generation_plan_rejects_invalid_multiple_stub_counts(self) -> None:
         paystub = build_sample_paystub_data()
 
@@ -185,6 +206,86 @@ class YTDEngineTests(unittest.TestCase):
                     "stub_count": 27,
                 },
             )
+
+    def test_generation_schedule_supports_latest_anchor(self) -> None:
+        paystub = build_sample_paystub_data()
+        schedule = web_service.build_generation_schedule(
+            paystub,
+            {
+                "mode": "multiple",
+                "sequence_type": "pay_frequency",
+                "pay_frequency": "biweekly",
+                "stub_count": 3,
+                "anchor": "latest",
+            },
+        )
+
+        self.assertEqual(schedule["periods"][-1]["pay_date"], paystub["pay_date"])
+        self.assertLess(schedule["periods"][0]["pay_date"], schedule["periods"][-1]["pay_date"])
+        self.assertEqual(schedule["summary"]["anchor"], "latest")
+
+    def test_guided_draft_preview_calculates_taxes_and_ny_pfl(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "biweekly",
+                "pay_period_start": "2026-01-01",
+                "pay_period_end": "2026-01-14",
+                "pay_date": "2026-01-16",
+                "payroll_check_number": "000000101",
+                "compensation_type": "hourly",
+                "hourly_rate": 25.0,
+                "regular_hours": 80.0,
+            }
+        )
+
+        preview = web_service.preview_payload(draft)
+
+        self.assertEqual(preview["summary"]["gross_pay_current"], 2000.0)
+        self.assertIn("Federal Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
+        self.assertIn("NY State Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
+        self.assertIn("NY Paid Family Leave", [item["label"] for item in preview["paystub"]["deductions"]])
+
+    def test_guided_draft_generation_plan_rolls_ytd_forward_from_latest_anchor(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "biweekly",
+                "pay_period_start": "2026-03-05",
+                "pay_period_end": "2026-03-18",
+                "pay_date": "2026-03-20",
+                "payroll_check_number": "000000205",
+                "compensation_type": "hourly",
+                "hourly_rate": 30.0,
+                "regular_hours": 80.0,
+            }
+        )
+        plan = web_service.generation_plan_payload(
+            draft,
+            {
+                "mode": "multiple",
+                "sequence_type": "pay_frequency",
+                "pay_frequency": "biweekly",
+                "stub_count": 3,
+                "anchor": "latest",
+            },
+        )
+
+        self.assertEqual(plan["entries"][-1]["pay_date"], "2026-03-20")
+        self.assertGreater(plan["entries"][-1]["gross_pay_ytd"], plan["entries"][0]["gross_pay_ytd"])
+        self.assertEqual(plan["entries"][-1]["gross_pay_ytd"], round(plan["entries"][-1]["gross_pay_current"] * 3, 2))
 
 
 class TemplateRendererTests(unittest.TestCase):
