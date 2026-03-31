@@ -401,6 +401,8 @@ def _build_automatic_employee_config(paystub: Paystub):
     resolved_weekly_hours = max(0.0, float(paystub.weekly_hours or 0.0))
     resolved_hourly_rate = max(0.0, float(paystub.hourly_rate or 0.0))
     resolved_regular_hours = max(0.0, float(paystub.regular_hours or 0.0))
+    salary_period_amount = 0.0
+    annual_salary = 0.0
     if manual_stub_amount:
         earnings.append(EarningLine(label=primary_label, flat_amount=manual_stub_amount))
         resolved_hourly_rate = 0.0
