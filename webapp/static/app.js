@@ -209,6 +209,31 @@ function bind() {
   els.form.addEventListener("input", handleInput);
   els.form.addEventListener("change", handleInput);
 
+  // Company logo upload
+  const logoInput = document.getElementById("company_logo_file");
+  if (logoInput) {
+    logoInput.addEventListener("change", () => {
+      const file = logoInput.files[0];
+      const preview = document.getElementById("company_logo_preview");
+      if (!file) {
+        state.paystub.company_logo = "";
+        if (preview) preview.innerHTML = "";
+        return;
+      }
+      if (file.size > 512000) {
+        alert("Logo must be under 500 KB.");
+        logoInput.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.paystub.company_logo = reader.result;
+        if (preview) preview.innerHTML = `<img src="${reader.result}" style="max-height:40px;max-width:120px;border-radius:4px" alt="Logo preview" />`;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   document.addEventListener("click", async (event) => {
     const proxyTrigger = event.target.closest("[data-proxy-click]");
     if (proxyTrigger) {

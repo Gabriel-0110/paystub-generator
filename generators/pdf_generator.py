@@ -1,4 +1,6 @@
 import hashlib
+import io
+import base64
 from enum import Enum
 from pathlib import Path
 
@@ -172,6 +174,19 @@ def _get_adp_logo() -> ImageReader | None:
     except Exception:
         ADP_LOGO_READER = None
     return ADP_LOGO_READER
+
+
+def _resolve_logo(custom_logo: str = "") -> ImageReader | None:
+    """Return an ImageReader for a custom base64 data-URI logo, falling back to the ADP asset."""
+    if custom_logo:
+        try:
+            if custom_logo.startswith("data:"):
+                custom_logo = custom_logo.split(",", 1)[1]
+            raw = base64.b64decode(custom_logo)
+            return ImageReader(io.BytesIO(raw))
+        except Exception:
+            pass
+    return _get_adp_logo()
 
 
 def _company_code(paystub: Paystub) -> str:
@@ -647,10 +662,10 @@ def draw_monogram_badge(c, x, y, w, h, text="PG", *, fill=WHITE, stroke=GRID_STR
     draw_center(c, x + (w / 2), y + h * 0.28, text, size=max(8, h * 0.58), bold=True, color=color)
 
 
-def draw_logo_or_badge(c, x, y, w, h, *, text="PG", preserve_aspect=True):
-    logo = _get_adp_logo()
-    if logo is not None:
-        c.drawImage(logo, x, y, width=w, height=h, mask="auto", preserveAspectRatio=preserve_aspect, anchor="c")
+def draw_logo_or_badge(c, x, y, w, h, *, text="PG", preserve_aspect=True, custom_logo: str = ""):
+    img = _resolve_logo(custom_logo)
+    if img is not None:
+        c.drawImage(img, x, y, width=w, height=h, mask="auto", preserveAspectRatio=preserve_aspect, anchor="c")
     return
 
 
@@ -1317,7 +1332,7 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     logo_sz = 20
     logo_x = ck_x + side_strip + 8
     logo_y_pos = ck_y + ck_h - strip_h + (strip_h - logo_sz) // 2
-    draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text="PG")
+    draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text="PG", custom_logo=paystub.company_logo or "")
 
     left_panel_w = div_x - (ck_x + side_strip + 18)
     draw_fit_text(c, logo_x + logo_sz + 18, ck_y + ck_h - 10, left_panel_w - 52, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)

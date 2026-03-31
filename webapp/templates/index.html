@@ -214,12 +214,20 @@
                   <small id="payroll_check_number-error" class="field-error" data-for="payroll_check_number" role="alert" aria-live="polite"></small>
                 </label>
               </div>
-              <label class="field">
-                <span>Company address</span>
-                <textarea id="company_address" name="company_address" rows="3" autocomplete="street-address" aria-describedby="company_address-error" required></textarea>
-                <small class="field-hint">Use line breaks for multi-line mailing addresses.</small>
-                <small id="company_address-error" class="field-error" data-for="company_address" role="alert" aria-live="polite"></small>
-              </label>
+              <div class="section-grid two-up">
+                <label class="field">
+                  <span>Company address</span>
+                  <textarea id="company_address" name="company_address" rows="3" autocomplete="street-address" aria-describedby="company_address-error" required></textarea>
+                  <small class="field-hint">Use line breaks for multi-line mailing addresses.</small>
+                  <small id="company_address-error" class="field-error" data-for="company_address" role="alert" aria-live="polite"></small>
+                </label>
+                <div class="field">
+                  <span>Company logo</span>
+                  <input id="company_logo_file" type="file" accept="image/png,image/jpeg,image/gif,image/webp" />
+                  <small class="field-hint">Optional. Appears on the check stub. PNG or JPG, max 500 KB.</small>
+                  <div id="company_logo_preview" style="margin-top:4px"></div>
+                </div>
+              </div>
               <div class="section-grid three-up">
                 <label class="field">
                   <span>Employee name</span>

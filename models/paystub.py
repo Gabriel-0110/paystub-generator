@@ -53,6 +53,7 @@ class Paystub(BaseModel):
     direct_deposit_amount: float = 0.0
 
     social_security_number: str = ""
+    company_logo: str = ""
     taxable_marital_status: str = ""
     exemptions_allowances: str = ""
     payroll_check_number: str = ""
