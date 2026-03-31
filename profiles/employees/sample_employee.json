@@ -1,0 +1,42 @@
+{
+  "profile_id": "sample_employee",
+  "employee_id": "EMP-2001",
+  "employee_name": "Jordan Lee",
+  "employee_address": "350 RIVER PLACE\nBROOKLYN, NY 11201",
+  "social_security_number": "000-00-0000",
+  "earnings": [
+    {
+      "label": "Regular",
+      "rate": 31.25,
+      "hours": 80.0,
+      "flat_amount": 0.0
+    }
+  ],
+  "other_benefits": [
+    {
+      "label": "Group Term Life",
+      "current": 0.51,
+      "ytd": 0.51
+    },
+    {
+      "label": "Loan Amt Paid",
+      "current": 0.0,
+      "ytd": 0.0
+    },
+    {
+      "label": "Accrual Hrs",
+      "current": 40.0,
+      "ytd": 40.0
+    },
+    {
+      "label": "Sick Hrs",
+      "current": 16.0,
+      "ytd": 16.0
+    }
+  ],
+  "important_notes": [
+    "EFFECTIVE THIS PAY PERIOD YOUR REGULAR",
+    "HOURLY RATE HAS BEEN CHANGED FROM $0.00",
+    "TO $31.25 PER HOUR."
+  ]
+}

@@ -1,0 +1,38 @@
+# Python caches and build outputs
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+site/
+wheels/
+*.egg-info/
+
+# Virtual environments and local tooling
+.venv/
+.env
+.env.*
+!.env.example
+
+# Local app output and exports
+output/
+exports/
+
+# Temporary or review-only local artifacts
+review/*
+!review/README.md
+tmp_cli_verify/
+tmp_io_cli/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,11 @@
+{
+  "profile_id": "ny_single_biweekly",
+  "filing_status": "Single",
+  "frequency": "biweekly",
+  "allowances": 0,
+  "additional_federal_wh": 0.0,
+  "state": "NY",
+  "state_tax_rate_override": null,
+  "local_tax_rate": 0.03876,
+  "local_tax_label": "NYC Income Tax"
+}

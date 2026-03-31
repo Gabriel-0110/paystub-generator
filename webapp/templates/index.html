@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_title }}</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Local Payroll Workspace</p>
+          <h1>{{ app_title }}</h1>
+          <p class="hero-text">
+            Build payroll statements, review totals clearly, and generate print-ready PDFs from the
+            existing paystub engine without leaving your browser.
+          </p>
+        </div>
+        <div class="hero-status">
+          <div class="status-card">
+            <span class="status-label">Mode</span>
+            <strong>Local-first</strong>
+            <p>Drafts persist in your browser. PDFs are generated on this machine.</p>
+          </div>
+          <div class="status-card">
+            <span class="status-label">Backend</span>
+            <strong>Python generator</strong>
+            <p>Preview and PDF generation reuse the repo’s existing paystub model and renderer.</p>
+          </div>
+        </div>
+      </header>
+
+      <main id="main-content" class="workspace">
+        <section class="editor-panel">
+          <div class="panel-head">
+            <div>
+              <p class="section-kicker">Draft Builder</p>
+              <h2>Paystub input</h2>
+            </div>
+            <div class="panel-actions">
+              <label class="field compact-field">
+                <span>Template</span>
+                <select id="template-select" aria-label="Paystub template"></select>
+              </label>
+              <button id="load-sample-button" type="button" class="ghost-button">Load sample</button>
+              <button id="reset-button" type="button" class="ghost-button">Reset draft</button>
+            </div>
+          </div>
+
+          <div id="app-message" class="message-banner" role="status" aria-live="polite"></div>
+          <div class="utility-row" aria-live="polite">
+            <span id="draft-status" class="draft-status">Loading workspace…</span>
+            <span id="preview-status" class="preview-status">Preview ready state unavailable.</span>
+          </div>
+
+          <section class="workflow-band" aria-labelledby="workflow-tools-heading">
+            <div class="workflow-band-head">
+              <div>
+                <p class="section-kicker">Profile Workspace</p>
+                <h3 id="workflow-tools-heading">Load saved assignments or move profile bundles in and out</h3>
+              </div>
+              <div id="profile-summary" class="profile-summary" aria-live="polite"></div>
+            </div>
+
+            <div class="workflow-grid">
+              <section class="workflow-card" aria-labelledby="assignment-loader-heading">
+                <div class="workflow-card-head">
+                  <div>
+                    <h4 id="assignment-loader-heading">Assignment loader</h4>
+                    <p>Populate the editor from saved payroll profiles and a real pay period.</p>
+                  </div>
+                  <button id="load-assignment-button" type="button" class="secondary-button">Load assignment</button>
+                </div>
+                <div class="section-grid assignment-grid">
+                  <label class="field">
+                    <span>Assignment</span>
+                    <select id="assignment-select" aria-label="Saved payroll assignment"></select>
+                  </label>
+                  <label class="field compact-field">
+                    <span>Year</span>
+                    <input id="assignment-year" type="number" min="2020" max="2100" inputmode="numeric" />
+                  </label>
+                  <label class="field">
+                    <span>Pay period</span>
+                    <select id="assignment-period" aria-label="Pay period"></select>
+                  </label>
+                </div>
+                <p id="assignment-meta" class="workflow-meta">No saved assignments loaded yet.</p>
+              </section>
+
+              <section class="workflow-card" aria-labelledby="profile-transfer-heading">
+                <div class="workflow-card-head">
+                  <div>
+                    <h4 id="profile-transfer-heading">Profile transfer</h4>
+                    <p>Export the repo profile store or import a bundle without leaving the app.</p>
+                  </div>
+                </div>
+                <div class="section-grid transfer-grid">
+                  <label class="field compact-field">
+                    <span>Export format</span>
+                    <select id="export-format" aria-label="Profile export format"></select>
+                  </label>
+                  <button id="export-profiles-button" type="button" class="ghost-button">Export profiles</button>
+                  <label class="field">
+                    <span>Import bundle</span>
+                    <input id="import-file" type="file" />
+                    <small class="field-hint">Use JSON, XLSX, or a ZIP file containing the CSV bundle.</small>
+                    <small id="import-file-status" class="field-hint">Choose a bundle to enable import.</small>
+                  </label>
+                  <div class="transfer-actions">
+                    <label class="field compact-field">
+                      <span>Import format</span>
+                      <select id="import-format" aria-label="Profile import format"></select>
+                    </label>
+                    <button id="import-profiles-button" type="button" class="ghost-button">Import profiles</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="workflow-card workflow-card-wide" aria-labelledby="profile-editor-heading">
+                <div class="workflow-card-head">
+                  <div>
+                    <h4 id="profile-editor-heading">Profile editor</h4>
+                    <p>Edit individual company, employee, tax, deduction, or assignment records in place.</p>
+                  </div>
+                  <div class="inline-actions">
+                    <button id="new-profile-button" type="button" class="ghost-button">New profile</button>
+                    <button id="load-profile-button" type="button" class="ghost-button">Load record</button>
+                    <button id="save-profile-button" type="button" class="secondary-button">Save profile</button>
+                  </div>
+                </div>
+                <div class="section-grid profile-editor-grid">
+                  <label class="field compact-field">
+                    <span>Profile type</span>
+                    <select id="profile-type-select" aria-label="Profile type"></select>
+                  </label>
+                  <label class="field">
+                    <span>Saved record</span>
+                    <select id="profile-id-select" aria-label="Saved profile record"></select>
+                  </label>
+                </div>
+                <p id="profile-editor-status" class="workflow-meta">Choose a profile type and record to edit.</p>
+                <div id="profile-form-shell" class="profile-form-shell"></div>
+                <details class="profile-json-panel">
+                  <summary>Advanced JSON</summary>
+                  <div class="profile-json-panel-body">
+                    <div class="inline-actions">
+                      <button id="apply-profile-json-button" type="button" class="ghost-button">Apply JSON</button>
+                    </div>
+                    <label class="field profile-editor-field">
+                      <span>Record JSON</span>
+                      <textarea id="profile-json-editor" rows="14" autocomplete="off" spellcheck="false"></textarea>
+                      <small class="field-hint">Use this for advanced edits. Apply JSON before saving if you changed it manually.</small>
+                    </label>
+                  </div>
+                </details>
+              </section>
+            </div>
+          </section>
+
+          <form id="paystub-form" class="paystub-form" novalidate>
+            <fieldset class="form-section generation-section">
+              <legend>Generation Plan</legend>
+              <div class="generation-grid">
+                <label class="field compact-field">
+                  <span>Generation mode</span>
+                  <select id="generation_mode" name="generation_mode" aria-label="Generation mode">
+                    <option value="single">Single Paystub</option>
+                    <option value="multiple">Multiple Paystubs</option>
+                  </select>
+                  <small class="field-hint">Match the benchmark’s one-stub or add-dates workflow without changing your payroll data entry.</small>
+                </label>
+                <label class="field compact-field">
+                  <span>Sequence type</span>
+                  <select id="generation_sequence_type" name="generation_sequence_type" aria-label="Sequence type">
+                    <option value="pay_frequency">Custom pay periods</option>
+                    <option value="weekly">Weekly sequence generation</option>
+                  </select>
+                  <small class="field-hint">Use payroll frequency for weekly, biweekly, semi-monthly, or monthly periods. Use weekly for one-week sequences.</small>
+                </label>
+                <label class="field compact-field">
+                  <span>Pay frequency</span>
+                  <select id="generation_pay_frequency" name="generation_pay_frequency" aria-label="Generation pay frequency">
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Biweekly</option>
+                    <option value="semimonthly">Semi-monthly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                  <small class="field-hint">Controls how pay dates and pay periods roll forward when creating multiple stubs.</small>
+                </label>
+                <label class="field compact-field">
+                  <span>Number of stubs</span>
+                  <input id="generation_stub_count" name="generation_stub_count" type="number" min="1" max="26" inputmode="numeric" />
+                  <small class="field-hint">Generate a single pay period or a custom selected number of weeks or pay periods.</small>
+                  <small class="field-error" data-for="generation_stub_count"></small>
+                </label>
+              </div>
+              <div id="generation-plan-summary" class="generation-plan-summary" aria-live="polite"></div>
+            </fieldset>
+
+            <fieldset class="form-section">
+              <legend>Company</legend>
+              <div class="section-grid two-up">
+                <label class="field">
+                  <span>Company name</span>
+                  <input id="company_name" name="company_name" autocomplete="organization" required />
+                  <small class="field-hint">This is shown in the paystub header and PDF metadata.</small>
+                  <small class="field-error" data-for="company_name"></small>
+                </label>
+                <label class="field">
+                  <span>Payroll check number</span>
+                  <input id="payroll_check_number" name="payroll_check_number" inputmode="numeric" autocomplete="off" spellcheck="false" />
+                  <small class="field-hint">Optional, but useful for detached-check layouts.</small>
+                  <small class="field-error" data-for="payroll_check_number"></small>
+                </label>
+              </div>
+              <label class="field">
+                <span>Company address</span>
+                <textarea id="company_address" name="company_address" rows="3" autocomplete="street-address" required></textarea>
+                <small class="field-hint">Use line breaks for multi-line mailing addresses.</small>
+                <small class="field-error" data-for="company_address"></small>
+              </label>
+              <div class="section-grid two-up">
+                <div class="benchmark-note">
+                  <strong>Benchmark note</strong>
+                  <p>The benchmark tools expose more advanced employer fields such as EIN, phone, logo, and advanced address handling. This app currently keeps the PDF model aligned to the core company identity fields already supported by the renderer.</p>
+                </div>
+                <div class="benchmark-note">
+                  <strong>Template note</strong>
+                  <p>Template switching remains available at the top of the editor so you can preview, review, and correct data before generating the final PDF or ZIP batch.</p>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+              <legend>Employee</legend>
+              <div class="section-grid three-up">
+                <label class="field">
+                  <span>Employee name</span>
+                  <input id="employee_name" name="employee_name" autocomplete="name" required />
+                  <small class="field-error" data-for="employee_name"></small>
+                </label>
+                <label class="field">
+                  <span>Employee ID</span>
+                  <input id="employee_id" name="employee_id" autocomplete="off" spellcheck="false" required />
+                  <small class="field-error" data-for="employee_id"></small>
+                </label>
+                <label class="field">
+                  <span>Social Security number</span>
+                  <input id="social_security_number" name="social_security_number" type="tel" inputmode="numeric" autocomplete="off" spellcheck="false" />
+                  <small class="field-error" data-for="social_security_number"></small>
+                </label>
+              </div>
+              <div class="section-grid two-up">
+                <label class="field">
+                  <span>Employee address</span>
+                  <textarea id="employee_address" name="employee_address" rows="3" autocomplete="street-address"></textarea>
+                  <small class="field-hint">Optional, but recommended for complete statements.</small>
+                  <small class="field-error" data-for="employee_address"></small>
+                </label>
+                <div class="section-grid nested-grid">
+                  <label class="field">
+                    <span>Taxable marital status</span>
+                    <input id="taxable_marital_status" name="taxable_marital_status" />
+                    <small class="field-error" data-for="taxable_marital_status"></small>
+                  </label>
+                  <label class="field">
+                    <span>Exemptions or allowances</span>
+                    <input id="exemptions_allowances" name="exemptions_allowances" />
+                    <small class="field-error" data-for="exemptions_allowances"></small>
+                  </label>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="form-section">
+              <legend>Pay Schedule</legend>
+              <div class="section-grid three-up">
+                <label class="field">
+                  <span>Pay period start</span>
+                  <input id="pay_period_start" name="pay_period_start" type="date" required />
+                  <small class="field-error" data-for="pay_period_start"></small>
+                </label>
+                <label class="field">
+                  <span>Pay period end</span>
+                  <input id="pay_period_end" name="pay_period_end" type="date" required />
+                  <small class="field-error" data-for="pay_period_end"></small>
+                </label>
+                <label class="field">
+                  <span>Pay date</span>
+                  <input id="pay_date" name="pay_date" type="date" required />
+                  <small class="field-error" data-for="pay_date"></small>
+                </label>
+              </div>
+            </fieldset>
+
+            <section class="repeater-section">
+              <div class="repeater-head">
+                <div>
+                  <h3>Earnings</h3>
+                  <p>Define regular pay plus benchmark-style extra earnings such as overtime, bonus, reimbursement, or commission lines.</p>
+                </div>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="earnings">Add earning</button>
+              </div>
+              <div id="earnings-list" class="repeater-list" data-empty-label="No earnings lines yet. Add an earning to calculate gross pay."></div>
+              <small class="field-error" data-for="earnings"></small>
+            </section>
+
+            <section class="repeater-section">
+              <div class="repeater-head">
+                <div>
+                  <h3>Taxes</h3>
+                  <p>Enter current and year-to-date withholding lines.</p>
+                </div>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="taxes">Add tax</button>
+              </div>
+              <div id="taxes-list" class="repeater-list" data-empty-label="No tax lines added. This section can stay empty for manual draft work."></div>
+            </section>
+
+            <section class="repeater-section">
+              <div class="repeater-head">
+                <div>
+                  <h3>Taxes, Deductions, and Additions</h3>
+                  <p>Use deductions for employee-paid items and adjustments for reimbursements, additions, or corrections that should appear alongside YTD values.</p>
+                </div>
+                <div class="inline-actions">
+                  <button type="button" class="ghost-button" data-action="add-row" data-section="deductions">Add deduction</button>
+                  <button type="button" class="ghost-button" data-action="add-row" data-section="adjustments">Add adjustment</button>
+                </div>
+              </div>
+              <div id="deductions-list" class="repeater-list" data-empty-label="No deductions added yet."></div>
+              <div id="adjustments-list" class="repeater-list secondary-list" data-empty-label="No adjustments added."></div>
+            </section>
+
+            <section class="repeater-section">
+              <div class="repeater-head">
+                <div>
+                  <h3>Benefits, Accruals, and Time Off</h3>
+                  <p>Record employer-paid benefits, PTO balances, sick/vacation accruals, or other informational balances that should carry YTD values.</p>
+                </div>
+                <button type="button" class="ghost-button" data-action="add-row" data-section="other_benefits">Add benefit</button>
+              </div>
+              <div id="other_benefits-list" class="repeater-list" data-empty-label="No benefit lines added yet."></div>
+            </section>
+
+            <fieldset class="form-section">
+              <legend>Notes</legend>
+              <div class="section-grid two-up">
+                <label class="field">
+                  <span>Important notes</span>
+                  <textarea id="important_notes" name="important_notes" rows="4"></textarea>
+                  <small class="field-hint">One note per line. These appear in the statement notes area.</small>
+                </label>
+                <label class="field">
+                  <span>Footnotes</span>
+                  <textarea id="footnotes" name="footnotes" rows="4"></textarea>
+                  <small class="field-hint">Use for small-print callouts or payroll reminders.</small>
+                </label>
+              </div>
+            </fieldset>
+
+            <div class="form-footer">
+              <div class="footer-copy">
+                <p>Preview validates and normalizes totals. Generate produces a PDF in the local output folder.</p>
+              </div>
+              <div class="footer-actions">
+                <button id="preview-button" type="submit" class="primary-button">Refresh preview</button>
+                <button id="generate-button" type="button" class="secondary-button">Generate PDF</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <aside class="preview-panel">
+          <div class="preview-card">
+            <div class="preview-head">
+              <div>
+                <p class="section-kicker">Live Output</p>
+                <h2>Paystub preview</h2>
+              </div>
+              <span id="preview-badge" class="preview-badge">Awaiting preview</span>
+            </div>
+            <div id="preview-empty" class="preview-empty">
+              <h3>No preview yet</h3>
+              <p>Fill in the form and refresh the preview to validate totals before generating a PDF.</p>
+            </div>
+            <div id="preview-content" class="preview-content" hidden>
+              <section id="preview-summary" class="summary-grid"></section>
+              <section id="preview-meta" class="preview-block"></section>
+              <section id="preview-generation" class="preview-block"></section>
+              <section id="preview-lines" class="preview-lines"></section>
+              <section id="preview-notes" class="preview-block"></section>
+            </div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <noscript>
+      <div class="noscript-banner">This app requires JavaScript to manage the draft editor and preview workflow.</div>
+    </noscript>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "profile_id": "sample_payroll",
+  "company_profile_id": "northwind_ops_llc",
+  "employee_profile_id": "sample_employee",
+  "tax_profile_id": "ny_single_biweekly",
+  "deduction_profile_id": "default_employee_deductions",
+  "payroll_check_number_start": 1
+}

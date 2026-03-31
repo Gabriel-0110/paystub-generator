@@ -1,0 +1,48 @@
+[project]
+name = "paystub-generator"
+version = "0.1.0"
+description = "CLI and FastAPI tooling for generating payroll paystub PDFs from reusable profile data."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Gabriel Chiappa", email = "gabriel.chiappa@outlook.com" },
+]
+keywords = ["payroll", "paystub", "pdf", "fastapi", "reportlab"]
+dependencies = [
+    "fastapi>=0.116.0",
+    "httpx>=0.28.0",
+    "jinja2>=3.1.6",
+    "openpyxl>=3.1.5",
+    "playwright>=1.58.0",
+    "pydantic>=2.12.5",
+    "pypdfium2>=4.30.0",
+    "python-dateutil>=2.9.0.post0",
+    "python-multipart>=0.0.22",
+    "reportlab>=4.4.10",
+    "uvicorn>=0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.0",
+]
+
+[project.scripts]
+paystub-generator = "main:cli"
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main", "sample_data"]
+
+[tool.setuptools.packages.find]
+include = ["generators", "models", "webapp", "webapp.*"]
+
+[tool.setuptools.package-data]
+webapp = ["templates/*.html", "static/*.css", "static/*.js"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,16 @@
+{
+  "profile_id": "default_employee_deductions",
+  "pre_tax_deductions": [
+    {
+      "label": "401(k)",
+      "amount": 62.5,
+      "is_pretax": true
+    },
+    {
+      "label": "Health Ins.",
+      "amount": 45.0,
+      "is_pretax": true
+    }
+  ],
+  "post_tax_deductions": []
+}
