@@ -32,7 +32,7 @@ Email: `gabriel.chiappa@outlook.com`
 
 ## Installation
 
-### Option 1: `uv` workflow
+Use `uv` for environment creation, dependency sync, and command execution:
 
 ```powershell
 uv sync
@@ -42,21 +42,6 @@ For test tooling such as `pytest`, install the dev extra as well:
 
 ```powershell
 uv sync --extra dev
-```
-
-### Option 2: editable install with `pip`
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -e .
-```
-
-For development tooling:
-
-```powershell
-pip install -e .[dev]
 ```
 
 ## Environment and setup
@@ -94,10 +79,10 @@ Full-year batch for all saved assignments:
 uv run python main.py --mode year --year 2026
 ```
 
-If installed editable, you can also use the console command:
+You can also use the packaged console command through `uv`:
 
 ```powershell
-paystub-generator --mode single --assignment sample_payroll --year 2026 --period 1
+uv run paystub-generator --mode single --assignment sample_payroll --year 2026 --period 1
 ```
 
 ### Local web app
@@ -204,7 +189,7 @@ Run the automated test suite with the built-in `unittest` runner:
 uv run python -m unittest -q
 ```
 
-If you installed the dev extra, the same suite also runs under `pytest`:
+If you synced the dev extra, the same suite also runs under `pytest`:
 
 ```powershell
 uv run --extra dev python -m pytest -q
