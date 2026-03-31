@@ -36,6 +36,7 @@ Use `uv` for environment creation, dependency sync, and command execution:
 
 ```powershell
 uv venv
+.venv\Scripts\Activate.ps1
 uv sync
 ```
 
