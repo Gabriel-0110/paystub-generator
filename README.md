@@ -35,6 +35,7 @@ Email: `gabriel.chiappa@outlook.com`
 Use `uv` for environment creation, dependency sync, and command execution:
 
 ```powershell
+uv venv
 uv sync
 ```
 
