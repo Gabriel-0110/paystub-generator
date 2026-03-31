@@ -46,6 +46,7 @@ const GUIDED_DRAFT_FIELDS = new Set([
   "additional_federal_withholding",
   "compensation_type",
   "primary_earning_label",
+  "salary_period_amount",
   "annual_salary",
   "weekly_hours",
   "hourly_rate",
@@ -555,7 +556,7 @@ function handleInput(event) {
     }
     clearFieldError(target.name);
   }
-  syncDerivedCompensationFields();
+  syncDerivedCompensationFields(state.paystub, target.name || "");
   state.previewStale = Boolean(state.preview);
   persistDraft();
   renderPreview();
@@ -970,7 +971,7 @@ function renderForm() {
     const field = document.getElementById(name);
     if (field) field.value = state.paystub[name] || "";
   });
-  ["allowances_count", "additional_federal_withholding", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours", "direct_deposit_amount"].forEach((name) => {
+  ["allowances_count", "additional_federal_withholding", "salary_period_amount", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours", "direct_deposit_amount"].forEach((name) => {
     const field = document.getElementById(name);
     if (field) field.value = String(state.paystub[name] ?? 0);
   });
@@ -1445,8 +1446,8 @@ function validate() {
 
   if (state.paystub.draft_mode) {
     if (state.paystub.compensation_type === "salary") {
-      if (numberValue(state.paystub.annual_salary) <= 0) {
-        errors.annual_salary = "Enter the annual salary.";
+      if (numberValue(state.paystub.salary_period_amount) <= 0 && numberValue(state.paystub.annual_salary) <= 0) {
+        errors.salary_period_amount = "Enter the salary amount for each pay period or the annual salary.";
       }
       if (numberValue(state.paystub.weekly_hours) <= 0) {
         errors.weekly_hours = "Enter the weekly hours worked.";
@@ -1905,17 +1906,30 @@ function periodsPerYearForFrequency(frequency) {
   return 26;
 }
 
-function syncDerivedCompensationFields(targetPaystub = state.paystub) {
+function syncDerivedCompensationFields(targetPaystub = state.paystub, changedField = "") {
   if (!targetPaystub || targetPaystub.compensation_type !== "salary") return;
+  const periodsPerYear = periodsPerYearForFrequency(targetPaystub.pay_frequency);
   const annualSalary = numberValue(targetPaystub.annual_salary);
+  const salaryPeriodAmount = numberValue(targetPaystub.salary_period_amount);
   const weeklyHours = numberValue(targetPaystub.weekly_hours);
-  if (annualSalary <= 0 || weeklyHours <= 0) {
+
+  if (changedField === "salary_period_amount" && salaryPeriodAmount > 0) {
+    targetPaystub.annual_salary = roundMoney(salaryPeriodAmount * periodsPerYear);
+  } else if (changedField === "annual_salary" && annualSalary > 0) {
+    targetPaystub.salary_period_amount = roundMoney(annualSalary / periodsPerYear);
+  } else if (salaryPeriodAmount > 0 && annualSalary <= 0) {
+    targetPaystub.annual_salary = roundMoney(salaryPeriodAmount * periodsPerYear);
+  } else if (annualSalary > 0 && salaryPeriodAmount <= 0) {
+    targetPaystub.salary_period_amount = roundMoney(annualSalary / periodsPerYear);
+  }
+
+  const resolvedAnnualSalary = numberValue(targetPaystub.annual_salary);
+  if (resolvedAnnualSalary <= 0 || weeklyHours <= 0) {
     targetPaystub.hourly_rate = 0;
     targetPaystub.regular_hours = 0;
     return;
   }
-  const periodsPerYear = periodsPerYearForFrequency(targetPaystub.pay_frequency);
-  targetPaystub.hourly_rate = roundMoney(annualSalary / (weeklyHours * 52));
+  targetPaystub.hourly_rate = roundMoney(resolvedAnnualSalary / (weeklyHours * 52));
   targetPaystub.regular_hours = roundMoney((weeklyHours * 52) / periodsPerYear);
 }
 
@@ -2027,6 +2041,7 @@ async function loadGuidedEmployeeProfile() {
     if (firstLine && Number(firstLine.flat_amount || 0) > 0) {
       state.paystub.compensation_type = "salary";
       state.paystub.primary_earning_label = firstLine.label || "Regular";
+      state.paystub.salary_period_amount = roundMoney(Number(firstLine.flat_amount || 0));
       state.paystub.annual_salary = roundMoney(Number(firstLine.flat_amount || 0) * payPeriodsPerYear);
       state.paystub.weekly_hours = Number(firstLine.hours || 0) > 0
         ? roundMoney((Number(firstLine.hours || 0) * payPeriodsPerYear) / 52)
@@ -2044,6 +2059,7 @@ async function loadGuidedEmployeeProfile() {
       state.paystub.primary_earning_label = firstLine?.label || "Regular";
       state.paystub.hourly_rate = numberValue(firstLine?.rate);
       state.paystub.regular_hours = numberValue(firstLine?.hours);
+      state.paystub.salary_period_amount = 0;
       state.paystub.annual_salary = 0;
       state.paystub.weekly_hours = 40;
       state.paystub.source_earnings = earnings.slice(firstLine ? 1 : 0).map((item) => ({
@@ -2108,7 +2124,7 @@ async function saveCurrentEmployeeProfile() {
           label: state.paystub.primary_earning_label || "Regular",
           rate: numberValue(state.paystub.hourly_rate),
           hours: numberValue(state.paystub.regular_hours),
-          flat_amount: numberValue(state.paystub.annual_salary) / payPeriodsPerYear,
+          flat_amount: numberValue(state.paystub.salary_period_amount) || (numberValue(state.paystub.annual_salary) / payPeriodsPerYear),
         }
       : { label: state.paystub.primary_earning_label || "Regular", rate: numberValue(state.paystub.hourly_rate), hours: numberValue(state.paystub.regular_hours), flat_amount: 0 };
   const earnings = [regularLine, ...(state.paystub.source_earnings || []).map((item) => ({

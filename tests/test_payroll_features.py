@@ -285,6 +285,36 @@ class YTDEngineTests(unittest.TestCase):
         self.assertEqual(primary_line["current"], 4000.0)
         self.assertIn("Federal Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
 
+    def test_guided_salary_draft_can_use_salary_period_amount(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "weekly",
+                "pay_period_start": "2026-01-01",
+                "pay_period_end": "2026-01-07",
+                "pay_date": "2026-01-09",
+                "payroll_check_number": "000000101",
+                "compensation_type": "salary",
+                "salary_period_amount": 1250.0,
+                "weekly_hours": 40.0,
+            }
+        )
+
+        preview = web_service.preview_payload(draft)
+
+        primary_line = preview["paystub"]["earnings"][0]
+        self.assertEqual(preview["paystub"]["salary_period_amount"], 1250.0)
+        self.assertEqual(preview["paystub"]["annual_salary"], 65000.0)
+        self.assertEqual(preview["paystub"]["hourly_rate"], 31.25)
+        self.assertEqual(preview["paystub"]["regular_hours"], 40.0)
+        self.assertEqual(primary_line["current"], 1250.0)
+
     def test_guided_draft_generation_plan_rolls_ytd_forward_from_latest_anchor(self) -> None:
         draft = web_service.empty_paystub_payload()
         draft.update(

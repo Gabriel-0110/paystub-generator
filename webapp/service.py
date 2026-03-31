@@ -300,6 +300,7 @@ def empty_paystub_payload() -> dict:
         "additional_federal_withholding": 0.0,
         "compensation_type": "hourly",
         "primary_earning_label": "Regular",
+        "salary_period_amount": 0.0,
         "annual_salary": 0.0,
         "weekly_hours": 40.0,
         "hourly_rate": 0.0,
@@ -406,9 +407,13 @@ def _build_automatic_employee_config(paystub: Paystub):
         resolved_regular_hours = 0.0
     elif str(paystub.compensation_type).lower() == "salary":
         periods = get_pay_periods(_parse_iso_date(paystub.pay_date).year, frequency)
+        salary_period_amount = max(0.0, float(paystub.salary_period_amount or 0.0))
         annual_salary = max(0.0, float(paystub.annual_salary or 0.0))
-        if annual_salary:
-            per_period_salary = round(annual_salary / max(1, len(periods)), 2)
+        if salary_period_amount > 0:
+            annual_salary = round(salary_period_amount * max(1, len(periods)), 2)
+        elif annual_salary > 0:
+            salary_period_amount = round(annual_salary / max(1, len(periods)), 2)
+        if annual_salary and salary_period_amount:
             if resolved_weekly_hours > 0:
                 resolved_hourly_rate = round(annual_salary / (resolved_weekly_hours * 52), 2)
                 resolved_regular_hours = round((resolved_weekly_hours * 52) / max(1, len(periods)), 2)
@@ -420,7 +425,7 @@ def _build_automatic_employee_config(paystub: Paystub):
                     label=primary_label,
                     rate=resolved_hourly_rate,
                     hours=resolved_regular_hours,
-                    flat_amount=per_period_salary,
+                    flat_amount=salary_period_amount,
                 )
             )
     else:
@@ -483,6 +488,8 @@ def _build_automatic_employee_config(paystub: Paystub):
         apply_ny_paid_family_leave=bool(paystub.auto_add_state_deductions),
     )
     return config, {
+        "salary_period_amount": round(salary_period_amount if str(paystub.compensation_type).lower() == "salary" else 0.0, 2),
+        "annual_salary": round(annual_salary if str(paystub.compensation_type).lower() == "salary" else 0.0, 2),
         "weekly_hours": round(resolved_weekly_hours, 2),
         "hourly_rate": round(resolved_hourly_rate, 2),
         "regular_hours": round(resolved_regular_hours, 2),
@@ -531,7 +538,8 @@ def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict
             "additional_federal_withholding": max(0.0, float(paystub.additional_federal_withholding or 0.0)),
             "compensation_type": paystub.compensation_type,
             "primary_earning_label": paystub.primary_earning_label,
-            "annual_salary": round(float(paystub.annual_salary or 0.0), 2),
+            "salary_period_amount": resolved_compensation["salary_period_amount"],
+            "annual_salary": resolved_compensation["annual_salary"],
             "weekly_hours": resolved_compensation["weekly_hours"],
             "hourly_rate": resolved_compensation["hourly_rate"],
             "regular_hours": resolved_compensation["regular_hours"],

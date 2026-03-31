@@ -63,6 +63,7 @@ class Paystub(BaseModel):
     compensation_type: str = "hourly"
     primary_earning_label: str = "Regular"
     annual_salary: float = 0.0
+    salary_period_amount: float = 0.0
     weekly_hours: float = 40.0
     hourly_rate: float = 0.0
     regular_hours: float = 0.0
