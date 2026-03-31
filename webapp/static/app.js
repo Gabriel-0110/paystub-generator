@@ -1987,10 +1987,12 @@ function syncCompensationInputs() {
   const salaryDriven = state.paystub?.compensation_type === "salary";
   const autoCalculatedHourlyRate = salaryDriven || hasSalaryBasedCompensationInputs(state.paystub);
   const fieldNames = ["salary_period_amount", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours"];
+  const activeEl = document.activeElement;
 
   fieldNames.forEach((name) => {
     const field = document.getElementById(name);
     if (!(field instanceof HTMLInputElement)) return;
+    if (field === activeEl) return;
     field.value = String(state.paystub?.[name] ?? 0);
   });
 
