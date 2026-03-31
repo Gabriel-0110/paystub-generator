@@ -1417,10 +1417,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
         draw_text(c, bank_x, bank_y - (i * 8), bline, size=5.5, color=TEXT_MUTED)
 
     draw_text(c, sig_x1 + 8, sig_y - 7, "AUTHORIZED SIGNATURE", size=5, color=TEXT)
-    company_address_lines = _address_lines(paystub.company_address, max_lines=2)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 54, paystub.company_name.upper(), size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 45, company_address_lines[0] if company_address_lines else "", size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 36, company_address_lines[1] if len(company_address_lines) > 1 else "", size=6, color=TEXT)
 
     check_num = paystub.payroll_check_number or _barcode_digits(paystub)[:9]
     micr_seed = _barcode_digits(paystub)
