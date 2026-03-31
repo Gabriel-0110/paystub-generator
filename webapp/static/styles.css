@@ -85,7 +85,7 @@ a {
   transition: top 180ms ease;
 }
 
-.skip-link:focus {
+.skip-link:focus-visible {
   top: 16px;
 }
 

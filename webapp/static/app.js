@@ -873,7 +873,7 @@ function renderForm() {
                         ${type === "number" ? 'inputmode="decimal" step="0.01" min="0"' : ""}
                         value="${escapeHtml(String(row[key] ?? ""))}"
                       />
-                      <small id="${inputId}-error" class="field-error row-error" data-for="${fieldKey}"></small>
+                      <small id="${inputId}-error" class="field-error row-error" data-for="${fieldKey}" role="alert" aria-live="polite"></small>
                     </label>
                   `;
                 })
@@ -1049,15 +1049,13 @@ async function generatePdf() {
     renderPreview();
     persistDraft();
     if (response.mode === "multiple") {
-      showMessage(
-        `Batch generated successfully. <a href="${response.download_url}">Download the ZIP</a>.`,
-        "success"
-      );
+      showMessage(downloadMessage("Batch generated successfully.", response.download_url, "Download the ZIP"), "success", {
+        allowHtml: true,
+      });
     } else {
-      showMessage(
-        `PDF generated successfully. <a href="${response.download_url}">Download the PDF</a>.`,
-        "success"
-      );
+      showMessage(downloadMessage("PDF generated successfully.", response.download_url, "Download the PDF"), "success", {
+        allowHtml: true,
+      });
     }
   } catch (error) {
     showMessage(formatError(error), "error");
@@ -1081,8 +1079,9 @@ async function exportProfiles() {
     link.click();
     link.remove();
     showMessage(
-      `Profile export ready. <a href="${response.download_url}">Download ${escapeHtml(response.filename)}</a>.`,
-      "success"
+      downloadMessage("Profile export ready.", response.download_url, `Download ${response.filename}`),
+      "success",
+      { allowHtml: true }
     );
   } catch (error) {
     showMessage(formatError(error), "error");
@@ -1472,8 +1471,12 @@ function clearWorking() {
   els.saveProfileButton.textContent = "Save profile";
 }
 
-function showMessage(message, tone) {
-  els.message.innerHTML = message;
+function showMessage(message, tone, options = {}) {
+  if (options.allowHtml) {
+    els.message.innerHTML = message;
+  } else {
+    els.message.textContent = message;
+  }
   els.message.className = `message-banner is-visible ${tone === "error" ? "is-error" : "is-success"}`;
 }
 
@@ -1572,11 +1575,19 @@ function formatError(error) {
   return error instanceof Error ? error.message : "Unexpected error.";
 }
 
+function downloadMessage(prefix, downloadUrl, linkLabel) {
+  return `${escapeHtml(prefix)} <a href="${escapeAttribute(downloadUrl)}">${escapeHtml(linkLabel)}</a>.`;
+}
+
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value);
 }

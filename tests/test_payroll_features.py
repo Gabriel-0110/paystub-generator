@@ -152,6 +152,40 @@ class YTDEngineTests(unittest.TestCase):
         self.assertGreater(plan["entries"][1]["gross_pay_ytd"], plan["entries"][0]["gross_pay_ytd"])
         self.assertGreater(plan["entries"][2]["net_pay_ytd"], plan["entries"][1]["net_pay_ytd"])
 
+    def test_generation_schedule_falls_back_to_day_based_roll_forward_when_dates_do_not_match_frequency(self) -> None:
+        paystub = build_sample_paystub_data()
+        paystub["pay_period_start"] = "2026-01-03"
+        paystub["pay_period_end"] = "2026-01-16"
+        paystub["pay_date"] = "2026-01-23"
+
+        schedule = web_service.build_generation_schedule(
+            paystub,
+            {
+                "mode": "multiple",
+                "sequence_type": "pay_frequency",
+                "pay_frequency": "biweekly",
+                "stub_count": 3,
+            },
+        )
+
+        self.assertEqual(schedule["periods"][0]["pay_period_start"], "2026-01-03")
+        self.assertEqual(schedule["periods"][1]["pay_period_start"], "2026-01-17")
+        self.assertEqual(schedule["periods"][2]["pay_date"], "2026-02-20")
+
+    def test_generation_plan_rejects_invalid_multiple_stub_counts(self) -> None:
+        paystub = build_sample_paystub_data()
+
+        with self.assertRaisesRegex(Exception, "between 1 and 26"):
+            web_service.build_generation_schedule(
+                paystub,
+                {
+                    "mode": "multiple",
+                    "sequence_type": "pay_frequency",
+                    "pay_frequency": "biweekly",
+                    "stub_count": 27,
+                },
+            )
+
 
 class TemplateRendererTests(unittest.TestCase):
     maxDiff = None

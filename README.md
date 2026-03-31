@@ -38,6 +38,12 @@ Email: `gabriel.chiappa@outlook.com`
 uv sync
 ```
 
+For test tooling such as `pytest`, install the dev extra as well:
+
+```powershell
+uv sync --extra dev
+```
+
 ### Option 2: editable install with `pip`
 
 ```powershell
@@ -192,10 +198,16 @@ Regenerate web snapshots:
 uv run python scripts\regenerate_web_snapshots.py --save-previews
 ```
 
-Run the automated test suite:
+Run the automated test suite with the built-in `unittest` runner:
 
 ```powershell
-uv run python -m unittest
+uv run python -m unittest -q
+```
+
+If you installed the dev extra, the same suite also runs under `pytest`:
+
+```powershell
+uv run --extra dev python -m pytest -q
 ```
 
 ## Limitations and future improvements

@@ -194,7 +194,7 @@
                   <span>Number of stubs</span>
                   <input id="generation_stub_count" name="generation_stub_count" type="number" min="1" max="26" inputmode="numeric" />
                   <small class="field-hint">Generate a single pay period or a custom selected number of weeks or pay periods.</small>
-                  <small class="field-error" data-for="generation_stub_count"></small>
+                  <small id="generation_stub_count-error" class="field-error" data-for="generation_stub_count" role="alert" aria-live="polite"></small>
                 </label>
               </div>
               <div id="generation-plan-summary" class="generation-plan-summary" aria-live="polite"></div>
@@ -205,22 +205,22 @@
               <div class="section-grid two-up">
                 <label class="field">
                   <span>Company name</span>
-                  <input id="company_name" name="company_name" autocomplete="organization" required />
+                  <input id="company_name" name="company_name" autocomplete="organization" aria-describedby="company_name-error" required />
                   <small class="field-hint">This is shown in the paystub header and PDF metadata.</small>
-                  <small class="field-error" data-for="company_name"></small>
+                  <small id="company_name-error" class="field-error" data-for="company_name" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Payroll check number</span>
-                  <input id="payroll_check_number" name="payroll_check_number" inputmode="numeric" autocomplete="off" spellcheck="false" />
+                  <input id="payroll_check_number" name="payroll_check_number" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="payroll_check_number-error" />
                   <small class="field-hint">Optional, but useful for detached-check layouts.</small>
-                  <small class="field-error" data-for="payroll_check_number"></small>
+                  <small id="payroll_check_number-error" class="field-error" data-for="payroll_check_number" role="alert" aria-live="polite"></small>
                 </label>
               </div>
               <label class="field">
                 <span>Company address</span>
-                <textarea id="company_address" name="company_address" rows="3" autocomplete="street-address" required></textarea>
+                <textarea id="company_address" name="company_address" rows="3" autocomplete="street-address" aria-describedby="company_address-error" required></textarea>
                 <small class="field-hint">Use line breaks for multi-line mailing addresses.</small>
-                <small class="field-error" data-for="company_address"></small>
+                <small id="company_address-error" class="field-error" data-for="company_address" role="alert" aria-live="polite"></small>
               </label>
               <div class="section-grid two-up">
                 <div class="benchmark-note">
@@ -239,37 +239,37 @@
               <div class="section-grid three-up">
                 <label class="field">
                   <span>Employee name</span>
-                  <input id="employee_name" name="employee_name" autocomplete="name" required />
-                  <small class="field-error" data-for="employee_name"></small>
+                  <input id="employee_name" name="employee_name" autocomplete="name" aria-describedby="employee_name-error" required />
+                  <small id="employee_name-error" class="field-error" data-for="employee_name" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Employee ID</span>
-                  <input id="employee_id" name="employee_id" autocomplete="off" spellcheck="false" required />
-                  <small class="field-error" data-for="employee_id"></small>
+                  <input id="employee_id" name="employee_id" autocomplete="off" spellcheck="false" aria-describedby="employee_id-error" required />
+                  <small id="employee_id-error" class="field-error" data-for="employee_id" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Social Security number</span>
-                  <input id="social_security_number" name="social_security_number" type="tel" inputmode="numeric" autocomplete="off" spellcheck="false" />
-                  <small class="field-error" data-for="social_security_number"></small>
+                  <input id="social_security_number" name="social_security_number" type="tel" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="social_security_number-error" />
+                  <small id="social_security_number-error" class="field-error" data-for="social_security_number" role="alert" aria-live="polite"></small>
                 </label>
               </div>
               <div class="section-grid two-up">
                 <label class="field">
                   <span>Employee address</span>
-                  <textarea id="employee_address" name="employee_address" rows="3" autocomplete="street-address"></textarea>
+                  <textarea id="employee_address" name="employee_address" rows="3" autocomplete="street-address" aria-describedby="employee_address-error"></textarea>
                   <small class="field-hint">Optional, but recommended for complete statements.</small>
-                  <small class="field-error" data-for="employee_address"></small>
+                  <small id="employee_address-error" class="field-error" data-for="employee_address" role="alert" aria-live="polite"></small>
                 </label>
                 <div class="section-grid nested-grid">
                   <label class="field">
                     <span>Taxable marital status</span>
-                    <input id="taxable_marital_status" name="taxable_marital_status" />
-                    <small class="field-error" data-for="taxable_marital_status"></small>
+                    <input id="taxable_marital_status" name="taxable_marital_status" aria-describedby="taxable_marital_status-error" />
+                    <small id="taxable_marital_status-error" class="field-error" data-for="taxable_marital_status" role="alert" aria-live="polite"></small>
                   </label>
                   <label class="field">
                     <span>Exemptions or allowances</span>
-                    <input id="exemptions_allowances" name="exemptions_allowances" />
-                    <small class="field-error" data-for="exemptions_allowances"></small>
+                    <input id="exemptions_allowances" name="exemptions_allowances" aria-describedby="exemptions_allowances-error" />
+                    <small id="exemptions_allowances-error" class="field-error" data-for="exemptions_allowances" role="alert" aria-live="polite"></small>
                   </label>
                 </div>
               </div>
@@ -280,18 +280,18 @@
               <div class="section-grid three-up">
                 <label class="field">
                   <span>Pay period start</span>
-                  <input id="pay_period_start" name="pay_period_start" type="date" required />
-                  <small class="field-error" data-for="pay_period_start"></small>
+                  <input id="pay_period_start" name="pay_period_start" type="date" aria-describedby="pay_period_start-error" required />
+                  <small id="pay_period_start-error" class="field-error" data-for="pay_period_start" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Pay period end</span>
-                  <input id="pay_period_end" name="pay_period_end" type="date" required />
-                  <small class="field-error" data-for="pay_period_end"></small>
+                  <input id="pay_period_end" name="pay_period_end" type="date" aria-describedby="pay_period_end-error" required />
+                  <small id="pay_period_end-error" class="field-error" data-for="pay_period_end" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Pay date</span>
-                  <input id="pay_date" name="pay_date" type="date" required />
-                  <small class="field-error" data-for="pay_date"></small>
+                  <input id="pay_date" name="pay_date" type="date" aria-describedby="pay_date-error" required />
+                  <small id="pay_date-error" class="field-error" data-for="pay_date" role="alert" aria-live="polite"></small>
                 </label>
               </div>
             </fieldset>
@@ -305,7 +305,7 @@
                 <button type="button" class="ghost-button" data-action="add-row" data-section="earnings">Add earning</button>
               </div>
               <div id="earnings-list" class="repeater-list" data-empty-label="No earnings lines yet. Add an earning to calculate gross pay."></div>
-              <small class="field-error" data-for="earnings"></small>
+              <small id="earnings-error" class="field-error" data-for="earnings" role="alert" aria-live="polite"></small>
             </section>
 
             <section class="repeater-section">
