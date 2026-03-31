@@ -1394,7 +1394,7 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     c.restoreState()
 
     # Bank info — bottom-left of check
-    bank_y = ck_y + 16
+    bank_y = ck_y + 30
     bank_x = payee_x
     bank_lines = []
     if paystub.bank_name:

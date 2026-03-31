@@ -553,6 +553,7 @@ def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict
             "important_notes": paystub.important_notes,
             "footnotes": computed.get("footnotes", []) + list(paystub.footnotes),
             "manual_stub_amount": round(float(paystub.manual_stub_amount or 0.0), 2) or None,
+            "company_logo": paystub.company_logo or "",
         }
     )
     return Paystub(**computed).model_dump(mode="json")
