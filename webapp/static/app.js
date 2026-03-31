@@ -46,6 +46,7 @@ const GUIDED_DRAFT_FIELDS = new Set([
   "compensation_type",
   "primary_earning_label",
   "annual_salary",
+  "weekly_hours",
   "hourly_rate",
   "regular_hours",
 ]);
@@ -63,7 +64,6 @@ const BENEFIT_LABEL_OPTIONS = ["PTO Balance", "Sick Balance", "Vacation Balance"
 
 const state = {
   emptyPaystub: null,
-  samplePaystub: null,
   paystub: null,
   template: "detached_check",
   generationMode: "single",
@@ -87,6 +87,7 @@ const state = {
   activeProfileId: "",
   profileRecord: null,
   profileEditorText: "",
+  autoPreviewTimer: null,
 };
 
 const els = {};
@@ -113,7 +114,9 @@ async function init() {
     renderForm();
     renderPreview();
     setDraftStatus("Workspace ready. Drafts save automatically.");
-    await refreshPreview(true);
+    if (!Object.keys(validate()).length) {
+      await refreshPreview(true);
+    }
   } catch (error) {
     showMessage(formatError(error), "error");
     setDraftStatus("Unable to load the local app.");
@@ -128,7 +131,6 @@ function cache() {
   els.previewStatus = document.getElementById("preview-status");
   els.previewButton = document.getElementById("preview-button");
   els.generateButton = document.getElementById("generate-button");
-  els.loadSampleButton = document.getElementById("load-sample-button");
   els.resetButton = document.getElementById("reset-button");
   els.previewBadge = document.getElementById("preview-badge");
   els.previewEmpty = document.getElementById("preview-empty");
@@ -318,17 +320,6 @@ function bind() {
     updateImportControls();
   });
 
-  els.loadSampleButton.addEventListener("click", async () => {
-    state.paystub = structuredClone(state.samplePaystub);
-    state.template = "detached_check";
-    resetGenerationPlan();
-    state.previewStale = true;
-    renderForm();
-    persistDraft();
-    showMessage("Sample payroll data loaded into the editor.", "success");
-    await refreshPreview(true);
-  });
-
   els.resetButton.addEventListener("click", async () => {
     if (!window.confirm("Clear the current draft and reset the editor?")) return;
     localStorage.removeItem(DRAFT_KEY);
@@ -343,7 +334,7 @@ function bind() {
     renderPreview();
     clearErrors();
     setDraftStatus("Draft cleared.");
-    showMessage("Draft reset. You can start blank or load the sample again.", "success");
+    showMessage("Draft reset. The builder is ready for a new payroll record.", "success");
   });
 
   els.generateButton.addEventListener("click", async () => {
@@ -353,7 +344,6 @@ function bind() {
 
 function applyBootstrap(bootstrap, { preserveDraft = false } = {}) {
   state.emptyPaystub = bootstrap.empty_paystub;
-  state.samplePaystub = bootstrap.sample_paystub;
   state.profileSummary = bootstrap.profile_summary || {};
   state.assignmentOptions = bootstrap.assignment_options || [];
   state.profileFormats = bootstrap.profile_formats || { export: [], import: [] };
@@ -379,12 +369,12 @@ function applyBootstrap(bootstrap, { preserveDraft = false } = {}) {
 function restoreDraft() {
   const saved = localStorage.getItem(DRAFT_KEY);
   if (!saved) {
-    state.paystub = structuredClone(state.samplePaystub);
+    state.paystub = structuredClone(state.emptyPaystub);
     return;
   }
   try {
     const parsed = JSON.parse(saved);
-    state.paystub = parsed.paystub || structuredClone(state.samplePaystub);
+    state.paystub = parsed.paystub || structuredClone(state.emptyPaystub);
     state.template = parsed.template || state.template;
     state.assignmentId = parsed.assignmentId || state.assignmentId;
     state.assignmentYear = clampYear(parsed.assignmentYear || state.assignmentYear);
@@ -400,12 +390,12 @@ function restoreDraft() {
     state.generationAnchor = parsed.generationAnchor || state.generationAnchor;
     setDraftStatus("Restored your last local draft.");
   } catch {
-    state.paystub = structuredClone(state.samplePaystub);
+    state.paystub = structuredClone(state.emptyPaystub);
   }
 }
 
 function ensureDefaultSelections() {
-  if (!state.paystub) state.paystub = structuredClone(state.samplePaystub);
+  if (!state.paystub) state.paystub = structuredClone(state.emptyPaystub);
   state.paystub.source_earnings = state.paystub.source_earnings || [];
   state.paystub.source_deductions = state.paystub.source_deductions || [];
   state.paystub.adjustments = state.paystub.adjustments || [];
@@ -524,9 +514,11 @@ function handleInput(event) {
     }
     clearFieldError(target.name);
   }
+  syncDerivedCompensationFields();
   state.previewStale = Boolean(state.preview);
   persistDraft();
   renderPreview();
+  scheduleAutoPreview();
 }
 
 function renderProfileControls() {
@@ -624,8 +616,8 @@ function renderProfileEditorForm() {
           ${profileScalarField("employee_address", "Employee address", { as: "textarea", wide: true })}
         </div>
       </section>
-      ${renderProfileObjectList("earnings", "Earnings", [["label", "Label", "text"], ["rate", "Rate", "number"], ["hours", "Hours", "number"], ["flat_amount", "Flat amount", "number"]], "Add earning")}
-      ${renderProfileObjectList("other_benefits", "Benefits", [["label", "Label", "text"], ["current", "Current", "number"], ["ytd", "YTD", "number"]], "Add benefit")}
+      ${renderProfileObjectList("earnings", "Earnings", [["label", "Label", "select"], ["rate", "Rate", "number"], ["hours", "Hours", "number"], ["flat_amount", "Flat amount", "number"]], "Add earning")}
+      ${renderProfileObjectList("other_benefits", "Benefits", [["label", "Label", "select"], ["current", "Current", "number"], ["ytd", "YTD", "number"]], "Add benefit")}
       ${renderProfileStringList("important_notes", "Important notes", "Add note")}
     `;
     return;
@@ -719,15 +711,24 @@ function renderProfileObjectList(listName, title, fields, addLabel) {
               ${fields.map(([key, fieldLabel, kind]) => `
                 <label class="field field-inline">
                   <span>${escapeHtml(fieldLabel)}</span>
-                  <input
-                    type="${kind === "number" ? "number" : "text"}"
-                    ${kind === "number" ? 'inputmode="decimal" step="0.01"' : ""}
-                    data-profile-list="${listName}"
-                    data-profile-index="${index}"
-                    data-profile-prop="${key}"
-                    data-profile-kind="${kind}"
-                    value="${escapeHtml(String(item[key] ?? ""))}"
-                  />
+                  ${
+                    kind === "select"
+                      ? `<select
+                          data-profile-list="${listName}"
+                          data-profile-index="${index}"
+                          data-profile-prop="${key}"
+                          data-profile-kind="${kind}"
+                        >${buildSimpleOptions(profileOptionsForField(listName, key), item[key] ?? "")}</select>`
+                      : `<input
+                          type="${kind === "number" ? "number" : "text"}"
+                          ${kind === "number" ? 'inputmode="decimal" step="0.01"' : ""}
+                          data-profile-list="${listName}"
+                          data-profile-index="${index}"
+                          data-profile-prop="${key}"
+                          data-profile-kind="${kind}"
+                          value="${escapeHtml(String(item[key] ?? ""))}"
+                        />`
+                  }
                 </label>
               `).join("")}
             </div>
@@ -919,10 +920,17 @@ function renderForm() {
     const field = document.getElementById(name);
     if (field) field.value = state.paystub[name] || "";
   });
-  ["allowances_count", "additional_federal_withholding", "annual_salary", "hourly_rate", "regular_hours"].forEach((name) => {
+  ["allowances_count", "additional_federal_withholding", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours"].forEach((name) => {
     const field = document.getElementById(name);
     if (field) field.value = String(state.paystub[name] ?? 0);
   });
+  const salaryDriven = state.paystub.compensation_type === "salary";
+  const weeklyHoursField = document.getElementById("weekly_hours");
+  const hourlyRateField = document.getElementById("hourly_rate");
+  const regularHoursField = document.getElementById("regular_hours");
+  if (weeklyHoursField) weeklyHoursField.readOnly = !salaryDriven;
+  if (hourlyRateField) hourlyRateField.readOnly = salaryDriven;
+  if (regularHoursField) regularHoursField.readOnly = salaryDriven;
   document.getElementById("important_notes").value = (state.paystub.important_notes || []).join("\n");
   document.getElementById("footnotes").value = (state.paystub.footnotes || []).join("\n");
   els.templateSelect.value = state.template;
@@ -1104,6 +1112,7 @@ function addRow(section) {
   renderForm();
   persistDraft();
   renderPreview();
+  scheduleAutoPreview();
 }
 
 function removeRow(section, index) {
@@ -1112,6 +1121,7 @@ function removeRow(section, index) {
   renderForm();
   persistDraft();
   renderPreview();
+  scheduleAutoPreview();
 }
 
 async function loadAssignmentDraft() {
@@ -1371,6 +1381,9 @@ function validate() {
       if (numberValue(state.paystub.annual_salary) <= 0) {
         errors.annual_salary = "Enter the annual salary.";
       }
+      if (numberValue(state.paystub.weekly_hours) <= 0) {
+        errors.weekly_hours = "Enter the weekly hours worked.";
+      }
     } else {
       if (numberValue(state.paystub.hourly_rate) <= 0) {
         errors.hourly_rate = "Enter the hourly rate.";
@@ -1518,6 +1531,7 @@ function renderPreview() {
 function buildSubmissionPaystub() {
   const paystub = structuredClone(state.paystub);
   paystub.draft_mode = Boolean(state.paystub.draft_mode);
+  syncDerivedCompensationFields(paystub);
   Object.keys(SECTION_CONFIG).forEach((section) => {
     paystub[section] = (paystub[section] || []).filter((row) => !isBlankRow(section, row));
   });
@@ -1571,7 +1585,6 @@ function setWorking(mode) {
   const allButtons = [
     els.previewButton,
     els.generateButton,
-    els.loadSampleButton,
     els.resetButton,
     els.loadAssignmentButton,
     els.exportProfilesButton,
@@ -1624,7 +1637,6 @@ function clearWorking() {
   [
     els.previewButton,
     els.generateButton,
-    els.loadSampleButton,
     els.resetButton,
     els.exportProfilesButton,
     els.importProfilesButton,
@@ -1720,6 +1732,48 @@ function optionsForField(section, key) {
   return [];
 }
 
+function profileOptionsForField(listName, key) {
+  if (key !== "label") return [];
+  if (listName === "earnings") return EARNING_LABEL_OPTIONS;
+  if (listName === "other_benefits") return BENEFIT_LABEL_OPTIONS;
+  if (listName === "pre_tax_deductions" || listName === "post_tax_deductions") return DEDUCTION_LABEL_OPTIONS;
+  return [];
+}
+
+function periodsPerYearForFrequency(frequency) {
+  if (frequency === "weekly") return 52;
+  if (frequency === "biweekly") return 26;
+  if (frequency === "semimonthly") return 24;
+  if (frequency === "monthly") return 12;
+  return 26;
+}
+
+function syncDerivedCompensationFields(targetPaystub = state.paystub) {
+  if (!targetPaystub || targetPaystub.compensation_type !== "salary") return;
+  const annualSalary = numberValue(targetPaystub.annual_salary);
+  const weeklyHours = numberValue(targetPaystub.weekly_hours);
+  if (annualSalary <= 0 || weeklyHours <= 0) {
+    targetPaystub.hourly_rate = 0;
+    targetPaystub.regular_hours = 0;
+    return;
+  }
+  const periodsPerYear = periodsPerYearForFrequency(targetPaystub.pay_frequency);
+  targetPaystub.hourly_rate = roundMoney(annualSalary / (weeklyHours * 52));
+  targetPaystub.regular_hours = roundMoney((weeklyHours * 52) / periodsPerYear);
+}
+
+function scheduleAutoPreview() {
+  if (state.autoPreviewTimer) {
+    window.clearTimeout(state.autoPreviewTimer);
+  }
+  state.autoPreviewTimer = window.setTimeout(async () => {
+    state.autoPreviewTimer = null;
+    if (state.working) return;
+    if (Object.keys(validate()).length) return;
+    await refreshPreview(true);
+  }, 450);
+}
+
 function buildSimpleOptions(options, selected = "") {
   return (options || [])
     .map((option) => {
@@ -1800,12 +1854,7 @@ async function loadGuidedEmployeeProfile() {
     const record = response.record || {};
     const earnings = record.earnings || [];
     const firstLine = earnings[0] || null;
-    const payPeriodsPerYear = {
-      weekly: 52,
-      biweekly: 26,
-      semimonthly: 24,
-      monthly: 12,
-    }[state.paystub.pay_frequency || "biweekly"] || 26;
+    const payPeriodsPerYear = periodsPerYearForFrequency(state.paystub.pay_frequency || "biweekly");
     state.paystub.employee_name = record.employee_name || "";
     state.paystub.employee_id = record.employee_id || "";
     state.paystub.employee_address = record.employee_address || "";
@@ -1817,8 +1866,11 @@ async function loadGuidedEmployeeProfile() {
       state.paystub.compensation_type = "salary";
       state.paystub.primary_earning_label = firstLine.label || "Regular";
       state.paystub.annual_salary = roundMoney(Number(firstLine.flat_amount || 0) * payPeriodsPerYear);
-      state.paystub.hourly_rate = 0;
-      state.paystub.regular_hours = 0;
+      state.paystub.weekly_hours = Number(firstLine.hours || 0) > 0
+        ? roundMoney((Number(firstLine.hours || 0) * payPeriodsPerYear) / 52)
+        : 40;
+      state.paystub.hourly_rate = numberValue(firstLine.rate);
+      state.paystub.regular_hours = numberValue(firstLine.hours);
       state.paystub.source_earnings = earnings.slice(1).map((item) => ({
         label: item.label || "Overtime",
         rate: numberValue(item.rate),
@@ -1831,6 +1883,7 @@ async function loadGuidedEmployeeProfile() {
       state.paystub.hourly_rate = numberValue(firstLine?.rate);
       state.paystub.regular_hours = numberValue(firstLine?.hours);
       state.paystub.annual_salary = 0;
+      state.paystub.weekly_hours = 40;
       state.paystub.source_earnings = earnings.slice(firstLine ? 1 : 0).map((item) => ({
         label: item.label || "Overtime",
         rate: numberValue(item.rate),
@@ -1838,6 +1891,7 @@ async function loadGuidedEmployeeProfile() {
         amount: numberValue(item.flat_amount),
       }));
     }
+    syncDerivedCompensationFields();
     renderForm();
     persistDraft();
     showMessage(`Loaded employee profile ${escapeHtml(profileId)} into the builder.`, "success");
@@ -1884,15 +1938,16 @@ async function saveCurrentCompanyProfile() {
 }
 
 async function saveCurrentEmployeeProfile() {
-  const payPeriodsPerYear = {
-    weekly: 52,
-    biweekly: 26,
-    semimonthly: 24,
-    monthly: 12,
-  }[state.paystub.pay_frequency || "biweekly"] || 26;
+  syncDerivedCompensationFields();
+  const payPeriodsPerYear = periodsPerYearForFrequency(state.paystub.pay_frequency || "biweekly");
   const regularLine =
     state.paystub.compensation_type === "salary"
-      ? { label: state.paystub.primary_earning_label || "Regular", flat_amount: numberValue(state.paystub.annual_salary) / payPeriodsPerYear }
+      ? {
+          label: state.paystub.primary_earning_label || "Regular",
+          rate: numberValue(state.paystub.hourly_rate),
+          hours: numberValue(state.paystub.regular_hours),
+          flat_amount: numberValue(state.paystub.annual_salary) / payPeriodsPerYear,
+        }
       : { label: state.paystub.primary_earning_label || "Regular", rate: numberValue(state.paystub.hourly_rate), hours: numberValue(state.paystub.regular_hours), flat_amount: 0 };
   const earnings = [regularLine, ...(state.paystub.source_earnings || []).map((item) => ({
     label: item.label,

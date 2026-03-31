@@ -69,7 +69,7 @@ def capture_webapp_snapshots(base_url: str, output_dir: str | Path) -> dict[str,
 
             capture("default-workspace")
 
-            page.get_by_role("button", name="Refresh preview").click()
+            page.locator("#load-assignment-button").click()
             page.locator("#preview-badge.is-fresh").wait_for()
             capture("preview-current")
 

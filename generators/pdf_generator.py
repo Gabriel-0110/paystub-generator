@@ -1,3 +1,4 @@
+import hashlib
 from enum import Enum
 from pathlib import Path
 
@@ -171,6 +172,34 @@ def _get_adp_logo() -> ImageReader | None:
     except Exception:
         ADP_LOGO_READER = None
     return ADP_LOGO_READER
+
+
+def _company_code(paystub: Paystub) -> str:
+    parts = [part[:1] for part in str(paystub.company_name or "").split() if part]
+    return ("".join(parts)[:3] or "PAY").upper()
+
+
+def _barcode_digits(paystub: Paystub) -> str:
+    seed = f"{paystub.employee_id}|{paystub.pay_date}|{paystub.payroll_check_number}|{paystub.net_pay_current}"
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
+    digits = "".join(str(int(char, 16) % 10) for char in digest)
+    return digits[:12]
+
+
+def _format_address(value: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "\n" in text:
+        return text
+    return "\n".join(part.strip() for part in text.split(",") if part.strip())
+
+
+def _address_lines(value: str, *, max_lines: int | None = None) -> list[str]:
+    lines = [line.strip() for line in _format_address(value).splitlines() if line.strip()]
+    if max_lines is not None:
+        lines = lines[:max_lines]
+    return lines
 
 
 def _coerced_font_size(size: float) -> float:
@@ -373,25 +402,32 @@ def draw_summary_box(c, x, y, w, h, title, value, fill):
 
 
 def wrap_text_lines(c, text, width, size=8, bold=False, max_lines: int | None = None) -> list[str]:
-    words = [
-        ellipsize_text_to_width(c, word, width, size=size, bold=bold)
-        if text_width(c, word, size=size, bold=bold) > width
-        else word
-        for word in str(text).split()
-    ]
-    if not words:
-        return []
-
     lines: list[str] = []
-    current = words[0]
-    for word in words[1:]:
-        candidate = f"{current} {word}"
-        if text_width(c, candidate, size=size, bold=bold) <= width:
-            current = candidate
-        else:
-            lines.append(current)
-            current = word
-    lines.append(current)
+    paragraphs = [paragraph.strip() for paragraph in str(text).splitlines() if paragraph.strip()]
+    if not paragraphs:
+        paragraphs = [str(text).strip()]
+
+    for paragraph in paragraphs:
+        words = [
+            ellipsize_text_to_width(c, word, width, size=size, bold=bold)
+            if text_width(c, word, size=size, bold=bold) > width
+            else word
+            for word in paragraph.split()
+        ]
+        if not words:
+            continue
+        current = words[0]
+        for word in words[1:]:
+            candidate = f"{current} {word}"
+            if text_width(c, candidate, size=size, bold=bold) <= width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+
+    if not lines:
+        return []
 
     if max_lines is not None and len(lines) > max_lines:
         lines = lines[:max_lines]
@@ -579,8 +615,7 @@ def draw_logo_or_badge(c, x, y, w, h, *, text="PG", preserve_aspect=True):
     logo = _get_adp_logo()
     if logo is not None:
         c.drawImage(logo, x, y, width=w, height=h, mask="auto", preserveAspectRatio=preserve_aspect, anchor="c")
-        return
-    draw_monogram_badge(c, x, y, w, h, text=text, fill=WHITE, stroke=GRID_STRONG, color=TEXT)
+    return
 
 
 def draw_form_note_panel(
@@ -876,7 +911,7 @@ def _render_simple_stub(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_box(c, margin, page_top - header_h, width, header_h, fill=WHITE, stroke=GRID_STRONG, lw=0.55)
     draw_text(c, margin + 10, page_top - 15, "PAYROLL STATEMENT", size=6.2, bold=True, color=TEXT_MUTED)
     draw_fit_text(c, margin + 10, page_top - 31, width - net_w - 30, paystub.company_name.upper(), size=15.5, min_size=10.5, bold=True, color=INK)
-    draw_wrapped_text(c, margin + 10, page_top - 44, width - net_w - 30, paystub.company_address.replace("\n", ", "), size=6.6, color=TEXT_MUTED, leading=8, max_lines=2)
+    draw_wrapped_text(c, margin + 10, page_top - 44, width - net_w - 30, _format_address(paystub.company_address), size=6.6, color=TEXT_MUTED, leading=8, max_lines=2)
     draw_box(c, margin + width - net_w - 10, page_top - header_h + 8, net_w, header_h - 16, fill=INK, stroke=INK, lw=0.55)
     draw_text(c, margin + width - net_w, page_top - 17, "NET PAY", size=6.1, bold=True, color=PAPER)
     draw_fit_text(c, margin + width - 18, page_top - 38, net_w - 16, money(paystub.net_pay_current), size=19, min_size=13, bold=True, color=PAPER, align="right")
@@ -902,8 +937,8 @@ def _render_simple_stub(c: canvas.Canvas, paystub: Paystub) -> None:
 
     address_top = info_top - 52
     address_w = (width - 8) / 2
-    draw_form_field(c, margin, address_top, address_w, 50, "Employee Address", paystub.employee_address.replace("\n", ", ") or "Not provided", value_size=7.4)
-    draw_form_field(c, margin + address_w + 8, address_top, address_w, 50, "Company Address", paystub.company_address.replace("\n", ", "), value_size=7.4)
+    draw_form_field(c, margin, address_top, address_w, 50, "Employee Address", _format_address(paystub.employee_address) or "Not provided", value_size=7.4)
+    draw_form_field(c, margin + address_w + 8, address_top, address_w, 50, "Company Address", _format_address(paystub.company_address), value_size=7.4)
 
     summary_top = address_top - 58
     summary_w = (width - 12) / 4
@@ -974,7 +1009,7 @@ def _render_adp_like_statement(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_box(c, margin, page_top - header_h, width, header_h, fill=WHITE, stroke=GRID_STRONG, lw=0.55)
     draw_text(c, margin + 10, page_top - 15, "EARNINGS STATEMENT", size=6.2, bold=True, color=TEXT_MUTED)
     draw_fit_text(c, margin + 10, page_top - 31, width - net_w - 30, paystub.company_name.upper(), size=15.2, min_size=10.2, bold=True, color=INK)
-    draw_wrapped_text(c, margin + 10, page_top - 44, width - net_w - 30, paystub.company_address.replace("\n", ", "), size=6.6, color=TEXT_MUTED, leading=8, max_lines=2)
+    draw_wrapped_text(c, margin + 10, page_top - 44, width - net_w - 30, _format_address(paystub.company_address), size=6.6, color=TEXT_MUTED, leading=8, max_lines=2)
     draw_box(c, margin + width - net_w - 10, page_top - header_h + 9, net_w, header_h - 18, fill=INK, stroke=INK, lw=0.55)
     draw_text(c, margin + width - net_w, page_top - 16, "CURRENT NET PAY", size=6.0, bold=True, color=PAPER)
     draw_fit_text(c, margin + width - 18, page_top - 37, net_w - 16, money(paystub.net_pay_current), size=18.5, min_size=13, bold=True, color=PAPER, align="right")
@@ -996,8 +1031,8 @@ def _render_adp_like_statement(c: canvas.Canvas, paystub: Paystub) -> None:
 
     address_top = meta_top - 48
     address_w = (width - 8) / 2
-    draw_form_field(c, margin, address_top, address_w, 46, "Employee Address", paystub.employee_address.replace("\n", ", ") or "Not provided", value_size=7.2)
-    draw_form_field(c, margin + address_w + 8, address_top, address_w, 46, "Company Address", paystub.company_address.replace("\n", ", "), value_size=7.2)
+    draw_form_field(c, margin, address_top, address_w, 46, "Employee Address", _format_address(paystub.employee_address) or "Not provided", value_size=7.2)
+    draw_form_field(c, margin + address_w + 8, address_top, address_w, 46, "Company Address", _format_address(paystub.company_address), value_size=7.2)
 
     summary_top = address_top - 54
     summary_w = (width - 12) / 4
@@ -1088,19 +1123,18 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     for label, xpos in [("CO.", 42), ("FILE", 66), ("DEPT.", 92), ("CLOCK", 122), ("NUMBER", 160)]:
         draw_text(c, xpos, top_y - 10, label, size=5, color=TEXT_MUTED)
 
-    draw_text(c, 42, top_y - 20, "ABC", size=6, color=TEXT)
-    draw_text(c, 66, top_y - 20, "126543", size=6, color=TEXT)
-    draw_text(c, 92, top_y - 20, "123456", size=6, color=TEXT)
-    draw_text(c, 122, top_y - 20, "12345", size=6, color=TEXT)
-    draw_text(c, 160, top_y - 20, paystub.payroll_check_number or "00000000", size=6, color=TEXT)
-    draw_text(c, 200, top_y - 20, "1", size=6, color=TEXT)
+    draw_text(c, 42, top_y - 20, _company_code(paystub), size=6, color=TEXT)
+    draw_text(c, 66, top_y - 20, paystub.employee_id[:8] if paystub.employee_id else "", size=6, color=TEXT)
+    draw_text(c, 92, top_y - 20, paystub.work_state or "", size=6, color=TEXT)
+    draw_text(c, 122, top_y - 20, "", size=6, color=TEXT)
+    draw_text(c, 160, top_y - 20, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
 
     left_text_x = 38
     right_block_x = 348
     right_block_w = 190
 
     draw_fit_text(c, left_text_x, top_y - 36, 240, paystub.company_name.upper(), size=9.5, min_size=7.2, bold=True, color=TEXT)
-    draw_address_block(c, left_text_x, top_y - 47, paystub.company_address, size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
+    draw_address_block(c, left_text_x, top_y - 47, _format_address(paystub.company_address), size=7.0, leading=8, color=TEXT, width=240, max_lines=3)
 
     draw_text(c, right_block_x, top_y - 20, "Earnings Statement", size=13, bold=True, color=TEXT)
     draw_logo_or_badge(c, right_block_x + 162, top_y - 29, 50, 18, text="PG")
@@ -1109,15 +1143,14 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 50, paystub.pay_date, size=6.6, color=TEXT)
     draw_wrapped_text(c, right_block_x, top_y - 70, right_block_w, paystub.employee_name.upper(), size=8.8, bold=True, color=TEXT, leading=9, max_lines=3)
-    draw_wrapped_text(c, right_block_x, top_y - 96, right_block_w, paystub.employee_address.upper() or "NOT PROVIDED", size=7.6, bold=True, color=TEXT, leading=8.5, max_lines=3)
+    draw_wrapped_text(c, right_block_x, top_y - 96, right_block_w, (_format_address(paystub.employee_address) or "NOT PROVIDED").upper(), size=7.6, bold=True, color=TEXT, leading=8.5, max_lines=3)
 
     tax_y = top_y - 102
     draw_text(c, left_text_x, tax_y, f"Social Security Number: {paystub.social_security_number or 'Not provided'}", size=6.4, color=TEXT)
     draw_text(c, left_text_x, tax_y - 9, f"Taxable Marital Status: {paystub.taxable_marital_status or 'Not provided'}", size=6.4, color=TEXT)
     draw_text(c, left_text_x, tax_y - 18, f"Federal: {paystub.exemptions_allowances or '0'}", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 27, "Additional Tax: 0.00", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 36, "State: 2", size=6.4, color=TEXT)
-    draw_text(c, left_text_x, tax_y - 45, "Local: 2", size=6.4, color=TEXT)
+    draw_text(c, left_text_x, tax_y - 27, f"Additional Tax: {num(paystub.additional_federal_withholding)}", size=6.4, color=TEXT)
+    draw_text(c, left_text_x, tax_y - 36, f"State: {paystub.work_state or ''}", size=6.4, color=TEXT)
 
     statement_top = 590
     left_x = margin + 6
@@ -1182,26 +1215,28 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     if footnote_y > 208:
         draw_text(c, left_x + 2, footnote_y - 4, f"Your federal wages this period are {money(paystub.gross_pay_current)}", size=6.3, color=TEXT_MUTED)
 
-    benefits_bottom = draw_form_table(
-        c,
-        right_x,
-        statement_top,
-        right_w,
-        "Other Benefits and Information",
-        ("Description", "this period", "total to date"),
-        _table_rows_for_benefits(paystub),
-        column_widths=(3.2, 1.35, 1.35),
-        placeholder="No employer-paid items",
-        value_size=6.45,
-        header_size=5.5,
-        title_fill=SURFACE_ALT,
-        zebra_fill=None,
-    )
+    benefits_bottom = statement_top
+    if paystub.other_benefits:
+        benefits_bottom = draw_form_table(
+            c,
+            right_x,
+            statement_top,
+            right_w,
+            "Other Benefits and Information",
+            ("Description", "this period", "total to date"),
+            _table_rows_for_benefits(paystub),
+            column_widths=(3.2, 1.35, 1.35),
+            value_size=6.45,
+            header_size=5.5,
+            title_fill=SURFACE_ALT,
+            zebra_fill=None,
+        )
 
     tear_y = 184
-    notes_top = benefits_bottom - 8
-    notes_h = max(86, notes_top - (tear_y + 8))
-    draw_form_note_panel(c, right_x, notes_top, right_w, notes_h, "Important Notes", paystub.important_notes, fill=WHITE, stroke=GRID_STRONG)
+    if paystub.important_notes:
+        notes_top = benefits_bottom - 8
+        notes_h = max(86, notes_top - (tear_y + 8))
+        draw_form_note_panel(c, right_x, notes_top, right_w, notes_h, "Important Notes", paystub.important_notes, fill=WHITE, stroke=GRID_STRONG)
 
     c.setDash(3, 3)
     draw_rule(c, margin, tear_y, PAGE_WIDTH - margin, tear_y, color=LINE, lw=0.6)
@@ -1252,10 +1287,10 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_logo_or_badge(c, logo_x, logo_y_pos, 36, logo_sz, text="PG")
 
     draw_fit_text(c, logo_x + logo_sz + 18, ck_y + ck_h - 10, 155, paystub.company_name.upper(), size=7, min_size=6, bold=True, color=TEXT)
-    draw_address_block(c, logo_x + logo_sz + 18, ck_y + ck_h - 20, paystub.company_address, size=6, color=TEXT, width=155, max_lines=2)
+    draw_address_block(c, logo_x + logo_sz + 18, ck_y + ck_h - 20, _format_address(paystub.company_address), size=6, color=TEXT, width=155, max_lines=2)
 
     draw_text(c, div_x + 8, ck_y + ck_h - 9, "Payroll check number:", size=6, bold=True, color=TEXT)
-    draw_text(c, div_x + 110, ck_y + ck_h - 9, paystub.payroll_check_number or "000000001", size=6, color=TEXT)
+    draw_text(c, div_x + 110, ck_y + ck_h - 9, paystub.payroll_check_number or _barcode_digits(paystub)[:9], size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 19, "Pay date:", size=6, bold=True, color=TEXT)
     draw_text(c, div_x + 110, ck_y + ck_h - 19, paystub.pay_date, size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 29, "Social Security No.", size=6, bold=True, color=TEXT)
@@ -1264,14 +1299,6 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, div_x + 110, ck_y + ck_h - 39, money(paystub.net_pay_current), size=6, bold=True, color=INK)
 
     body_top = ck_y + ck_h - strip_h
-
-    c.saveState()
-    c.setFillColor(colors.HexColor("#CFCFC9"))
-    c.setFont("Helvetica-Bold", 38)
-    c.translate(ck_x + ck_w * 0.42, ck_y + (ck_h - strip_h) * 0.45)
-    c.rotate(22)
-    c.drawCentredString(0, 0, "SAMPLE")
-    c.restoreState()
 
     payee_x = ck_x + side_strip + 10
     payee_line_x = ck_x + side_strip + 64
@@ -1313,16 +1340,14 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     c.restoreState()
 
     draw_text(c, sig_x1 + 8, sig_y - 7, "AUTHORIZED SIGNATURE", size=5, color=TEXT)
-    draw_text(c, sig_x1 + 8, sig_y - 13, "VOID AFTER 90 DAYS", size=5, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 54, "BANK NAME", size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 45, "STREET ADDRESS", size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 36, "CITY, STATE ZIP", size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 24, "SAMPLE", size=7, bold=True, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 15, "NON-NEGOTIABLE", size=6, color=TEXT)
-    draw_text(c, ck_x + side_strip + 10, ck_y + 6, "VOID VOID VOID", size=6, color=TEXT)
+    company_address_lines = _address_lines(paystub.company_address, max_lines=2)
+    draw_text(c, ck_x + side_strip + 10, ck_y + 54, paystub.company_name.upper(), size=6, color=TEXT)
+    draw_text(c, ck_x + side_strip + 10, ck_y + 45, company_address_lines[0] if company_address_lines else "", size=6, color=TEXT)
+    draw_text(c, ck_x + side_strip + 10, ck_y + 36, company_address_lines[1] if len(company_address_lines) > 1 else "", size=6, color=TEXT)
 
-    check_num = paystub.payroll_check_number or "001379"
-    draw_text(c, ck_x + 118, ck_y + 6, f"\u2448{check_num}\u2448  :122000496:  040010157\u2448", size=9, color=TEXT)
+    check_num = paystub.payroll_check_number or _barcode_digits(paystub)[:9]
+    micr_seed = _barcode_digits(paystub)
+    draw_text(c, ck_x + 118, ck_y + 6, f"\u2448{check_num}\u2448  :{micr_seed[:9]}:  {micr_seed[3:12]}\u2448", size=9, color=TEXT)
 
 
 def generate_paystub_pdf(

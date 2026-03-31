@@ -39,8 +39,8 @@
               <p class="section-kicker">Guided Builder</p>
               <h2>Create a paystub step by step</h2>
               <p class="panel-intro">
-                Start from a sample, a saved assignment, or a blank draft. Then move through the form
-                in order and generate the final PDF from the review panel.
+                Start from a blank draft or a saved assignment. Then move through the form in order
+                and generate the final PDF from the review panel.
               </p>
             </div>
             <div class="panel-actions">
@@ -48,7 +48,6 @@
                 <span>Template</span>
                 <select id="template-select" aria-label="Paystub template"></select>
               </label>
-              <button id="load-sample-button" type="button" class="ghost-button">Load sample</button>
               <button id="reset-button" type="button" class="ghost-button">Start blank</button>
             </div>
           </div>
@@ -71,11 +70,10 @@
             <div class="quickstart-grid">
               <section class="quickstart-card">
                 <span class="step-badge">1</span>
-                <h4>Pick a starting point</h4>
-                <p>Use the sample to learn the flow or start blank if you already know the data.</p>
+                <h4>Start with a blank draft</h4>
+                <p>Enter real payroll data directly, or clear the form any time and begin again.</p>
                 <div class="inline-actions">
-                  <button type="button" class="secondary-button" id="quickstart-sample-button" data-proxy-click="load-sample-button">Use sample</button>
-                  <button type="button" class="ghost-button" id="quickstart-blank-button" data-proxy-click="reset-button">Start blank</button>
+                  <button type="button" class="secondary-button" id="quickstart-blank-button" data-proxy-click="reset-button">Start blank</button>
                 </div>
               </section>
 
@@ -310,18 +308,25 @@
                 <label class="field">
                   <span>Annual salary</span>
                   <input id="annual_salary" name="annual_salary" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="annual_salary-error" />
-                  <small class="field-hint">Used only when compensation type is salary.</small>
+                  <small class="field-hint">Enter the annual salary first. Taxes and per-period gross are calculated from this value.</small>
                   <small id="annual_salary-error" class="field-error" data-for="annual_salary" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Weekly hours worked</span>
+                  <input id="weekly_hours" name="weekly_hours" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="weekly_hours-error" />
+                  <small class="field-hint">Used with annual salary to calculate the hourly rate and per-period hours automatically.</small>
+                  <small id="weekly_hours-error" class="field-error" data-for="weekly_hours" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Hourly rate</span>
                   <input id="hourly_rate" name="hourly_rate" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="hourly_rate-error" />
-                  <small class="field-hint">Used only when compensation type is hourly.</small>
+                  <small class="field-hint">For salary, this is filled automatically from annual salary and weekly hours.</small>
                   <small id="hourly_rate-error" class="field-error" data-for="hourly_rate" role="alert" aria-live="polite"></small>
                 </label>
                 <label class="field">
                   <span>Regular hours</span>
                   <input id="regular_hours" name="regular_hours" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="regular_hours-error" />
+                  <small class="field-hint">For salary, this is calculated automatically for the selected pay frequency.</small>
                   <small id="regular_hours-error" class="field-error" data-for="regular_hours" role="alert" aria-live="polite"></small>
                 </label>
               </div>
@@ -333,7 +338,7 @@
               <div class="repeater-head">
                 <div>
                   <h3>Step 5 · Taxes</h3>
-                  <p>Federal, FICA, and state taxes are calculated automatically from the pay setup above.</p>
+                  <p>Federal, FICA, and state taxes are calculated automatically after the pay setup above is complete.</p>
                 </div>
               </div>
               <div id="taxes-list" class="repeater-list" data-empty-label="Taxes will appear here after you refresh the preview."></div>

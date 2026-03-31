@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+import pypdfium2 as pdfium
 
 from generators.batch_generator import (
     build_ytd_state,
@@ -252,6 +253,37 @@ class YTDEngineTests(unittest.TestCase):
         self.assertIn("NY State Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
         self.assertIn("NY Paid Family Leave", [item["label"] for item in preview["paystub"]["deductions"]])
 
+    def test_guided_salary_draft_derives_hourly_rate_from_annual_salary_and_weekly_hours(self) -> None:
+        draft = web_service.empty_paystub_payload()
+        draft.update(
+            {
+                "company_name": "Acme Payroll LLC",
+                "company_address": "1 Main St\nAlbany, NY 12207",
+                "employee_name": "Jamie Doe",
+                "employee_id": "EMP-9001",
+                "taxable_marital_status": "Single",
+                "work_state": "NY",
+                "pay_frequency": "biweekly",
+                "pay_period_start": "2026-01-01",
+                "pay_period_end": "2026-01-14",
+                "pay_date": "2026-01-16",
+                "payroll_check_number": "000000101",
+                "compensation_type": "salary",
+                "annual_salary": 104000.0,
+                "weekly_hours": 40.0,
+            }
+        )
+
+        preview = web_service.preview_payload(draft)
+
+        primary_line = preview["paystub"]["earnings"][0]
+        self.assertEqual(preview["paystub"]["hourly_rate"], 50.0)
+        self.assertEqual(preview["paystub"]["regular_hours"], 80.0)
+        self.assertEqual(primary_line["rate"], 50.0)
+        self.assertEqual(primary_line["hours"], 80.0)
+        self.assertEqual(primary_line["current"], 4000.0)
+        self.assertIn("Federal Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
+
     def test_guided_draft_generation_plan_rolls_ytd_forward_from_latest_anchor(self) -> None:
         draft = web_service.empty_paystub_payload()
         draft.update(
@@ -351,6 +383,42 @@ class TemplateRendererTests(unittest.TestCase):
 
     def test_long_content_visual_snapshots_match_baseline(self) -> None:
         self._assert_snapshot_case("long_content", build_long_content_paystub_data())
+
+    def test_detached_check_pdf_uses_live_values_without_sample_placeholders(self) -> None:
+        data = build_sample_paystub_data()
+        data.update(
+            {
+                "pay_period_end": "2026-02-28",
+                "pay_date": "2026-03-05",
+                "payroll_check_number": "000004219",
+                "employee_address": "4834 64TH STREET, FL 2\nWOODSIDE, NY 11377",
+                "other_benefits": [],
+                "important_notes": [],
+                "footnotes": [],
+            }
+        )
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(generate_paystub_pdf(data, output_dir=temp_dir, template=PaystubTemplate.DETACHED_CHECK))
+            pdf = pdfium.PdfDocument(str(path))
+            page = pdf[0]
+            textpage = page.get_textpage()
+            text = textpage.get_text_range()
+            textpage.close()
+            page.close()
+            pdf.close()
+
+        self.assertIn("Period ending: 2026-02-28", text)
+        self.assertIn("Pay date: 2026-03-05", text)
+        self.assertIn("4834 64TH STREET, FL 2", text)
+        self.assertIn("WOODSIDE, NY 11377", text)
+        self.assertIn("Payroll check number: 000004219", text)
+        self.assertNotIn("SAMPLE", text)
+        self.assertNotIn("VOID", text)
+        self.assertNotIn("NON-NEGOTIABLE", text)
+        self.assertNotIn("BANK NAME", text)
+        self.assertNotIn("CITY, STATE ZIP", text)
+        self.assertNotIn("OTHER BENEFITS AND INFORMATION", text)
 
 
 class ProfileStoreTests(unittest.TestCase):

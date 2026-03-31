@@ -295,6 +295,7 @@ def empty_paystub_payload() -> dict:
         "compensation_type": "hourly",
         "primary_earning_label": "Regular",
         "annual_salary": 0.0,
+        "weekly_hours": 40.0,
         "hourly_rate": 0.0,
         "regular_hours": 80.0,
         "auto_calculate_taxes": True,
@@ -388,17 +389,31 @@ def _build_automatic_employee_config(paystub: Paystub):
 
     earnings: list[EarningLine] = []
     primary_label = str(paystub.primary_earning_label or "Regular").strip() or "Regular"
+    resolved_weekly_hours = max(0.0, float(paystub.weekly_hours or 0.0))
+    resolved_hourly_rate = max(0.0, float(paystub.hourly_rate or 0.0))
+    resolved_regular_hours = max(0.0, float(paystub.regular_hours or 0.0))
     if str(paystub.compensation_type).lower() == "salary":
         periods = get_pay_periods(_parse_iso_date(paystub.pay_date).year, frequency)
         annual_salary = max(0.0, float(paystub.annual_salary or 0.0))
         if annual_salary:
             per_period_salary = round(annual_salary / max(1, len(periods)), 2)
-            earnings.append(EarningLine(label=primary_label, rate=per_period_salary, hours=1.0))
+            if resolved_weekly_hours > 0:
+                resolved_hourly_rate = round(annual_salary / (resolved_weekly_hours * 52), 2)
+                resolved_regular_hours = round((resolved_weekly_hours * 52) / max(1, len(periods)), 2)
+            else:
+                resolved_hourly_rate = 0.0
+                resolved_regular_hours = 0.0
+            earnings.append(
+                EarningLine(
+                    label=primary_label,
+                    rate=resolved_hourly_rate,
+                    hours=resolved_regular_hours,
+                    flat_amount=per_period_salary,
+                )
+            )
     else:
-        hourly_rate = max(0.0, float(paystub.hourly_rate or 0.0))
-        regular_hours = max(0.0, float(paystub.regular_hours or 0.0))
-        if hourly_rate or regular_hours:
-            earnings.append(EarningLine(label=primary_label, rate=hourly_rate, hours=regular_hours))
+        if resolved_hourly_rate or resolved_regular_hours:
+            earnings.append(EarningLine(label=primary_label, rate=resolved_hourly_rate, hours=resolved_regular_hours))
 
     for item in paystub.source_earnings:
         if not str(item.label).strip():
@@ -430,7 +445,7 @@ def _build_automatic_employee_config(paystub: Paystub):
         else:
             post_tax_deductions.append(deduction)
 
-    return EmployeePayConfig(
+    config = EmployeePayConfig(
         employee_id=paystub.employee_id,
         employee_name=paystub.employee_name,
         employee_address=paystub.employee_address,
@@ -450,10 +465,15 @@ def _build_automatic_employee_config(paystub: Paystub):
         payroll_check_number=paystub.payroll_check_number,
         apply_ny_paid_family_leave=bool(paystub.auto_add_state_deductions),
     )
+    return config, {
+        "weekly_hours": round(resolved_weekly_hours, 2),
+        "hourly_rate": round(resolved_hourly_rate, 2),
+        "regular_hours": round(resolved_regular_hours, 2),
+    }
 
 
 def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict | None = None) -> dict:
-    config = _build_automatic_employee_config(paystub)
+    config, resolved_compensation = _build_automatic_employee_config(paystub)
     if period:
         config.payroll_check_number = period["payroll_check_number"]
         pay_period_start = _parse_iso_date(period["pay_period_start"])
@@ -490,8 +510,9 @@ def _compute_automatic_paystub(paystub: Paystub, *, ytd_state=None, period: dict
             "compensation_type": paystub.compensation_type,
             "primary_earning_label": paystub.primary_earning_label,
             "annual_salary": round(float(paystub.annual_salary or 0.0), 2),
-            "hourly_rate": round(float(paystub.hourly_rate or 0.0), 2),
-            "regular_hours": round(float(paystub.regular_hours or 0.0), 2),
+            "weekly_hours": resolved_compensation["weekly_hours"],
+            "hourly_rate": resolved_compensation["hourly_rate"],
+            "regular_hours": resolved_compensation["regular_hours"],
             "auto_calculate_taxes": paystub.auto_calculate_taxes,
             "auto_add_state_deductions": paystub.auto_add_state_deductions,
             "source_earnings": [item.model_dump(mode="json") for item in paystub.source_earnings],
