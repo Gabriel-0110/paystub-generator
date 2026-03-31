@@ -177,6 +177,11 @@ def _get_adp_logo() -> ImageReader | None:
 def _company_code(paystub: Paystub) -> str:
     parts = [part[:1] for part in str(paystub.company_name or "").split() if part]
     return ("".join(parts)[:3] or "PAY").upper()
+    
+def _signature_initials(paystub: Paystub) -> str:
+    initials = [part[:1] for part in str(paystub.company_name or "").split() if part and part[0].isalpha()]
+    monogram = "".join(initials[:2]).upper()
+    return monogram or "AA"
 
 
 def _barcode_digits(paystub: Paystub) -> str:
@@ -661,6 +666,7 @@ def draw_form_note_panel(
     fill=WHITE,
     stroke=GRID_STRONG,
     max_lines: int | None = None,
+    empty_message: str | None = "No additional notes.",
 ):
     draw_box(c, x, top - h, w, h, fill=fill, stroke=stroke, lw=0.55)
     fill_rect(c, x, top - 15, w, 15, SURFACE_ALT)
@@ -680,7 +686,7 @@ def draw_form_note_panel(
         available_lines = min(available_lines, max_lines)
 
     content_lines: list[str] = []
-    source_lines = lines or ["No additional notes."]
+    source_lines = lines or ([empty_message] if empty_message else [])
     truncated = False
     for line in source_lines:
         wrapped = wrap_text_lines(c, line, w - 14, size=7.0)
@@ -721,7 +727,7 @@ def draw_form_table(
 ):
     if emphasize_labels is None:
         emphasize_labels = set()
-    if not rows:
+    if not rows and placeholder is not None:
         rows = [(placeholder,) + ("",) * (len(headers) - 1)]
 
     normalized_rows = [tuple("" if cell is None else str(cell) for cell in row) for row in rows]
@@ -1233,28 +1239,39 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     if footnote_y > 208:
         draw_text(c, left_x + 2, footnote_y - 4, f"Your federal wages this period are {money(paystub.gross_pay_current)}", size=6.3, color=TEXT_MUTED)
 
-    benefits_bottom = statement_top
-    if paystub.other_benefits:
-        benefits_bottom = draw_form_table(
-            c,
-            right_x,
-            statement_top,
-            right_w,
-            "Other Benefits and Information",
-            ("Description", "this period", "total to date"),
-            _table_rows_for_benefits(paystub),
-            column_widths=(3.2, 1.35, 1.35),
-            value_size=6.45,
-            header_size=5.5,
-            title_fill=SURFACE_ALT,
-            zebra_fill=None,
-        )
+    benefits_rows = _table_rows_for_benefits(paystub) if paystub.other_benefits else []
+    benefits_bottom = draw_form_table(
+        c,
+        right_x,
+        statement_top,
+        right_w,
+        "Other Benefits and Information",
+        ("Description", "this period", "total to date"),
+        benefits_rows if benefits_rows else [("No employer-paid items", "", "")],
+        column_widths=(3.2, 1.35, 1.35),
+        value_size=6.45,
+        header_size=5.5,
+        title_fill=SURFACE_ALT,
+        zebra_fill=None,
+        placeholder=None,
+    )
+    draw_form_note_panel(
+        c,
+        right_x,
+        notes_top,
+        right_w,
+        notes_h,
+        "Important Notes",
+        paystub.important_notes or [],
+        fill=WHITE,
+        stroke=GRID_STRONG,
+        empty_message=None,
+    )
 
     tear_y = 184
-    if paystub.important_notes:
-        notes_top = benefits_bottom - 8
-        notes_h = max(86, notes_top - (tear_y + 8))
-        draw_form_note_panel(c, right_x, notes_top, right_w, notes_h, "Important Notes", paystub.important_notes, fill=WHITE, stroke=GRID_STRONG)
+    notes_top = benefits_bottom - 8
+    notes_h = max(86, notes_top - (tear_y + 8))
+    draw_form_note_panel(c, right_x, notes_top, right_w, notes_h, "Important Notes", paystub.important_notes or [], fill=WHITE, stroke=GRID_STRONG)
 
     c.setDash(3, 3)
     draw_rule(c, margin, tear_y, PAGE_WIDTH - margin, tear_y, color=LINE, lw=0.6)
@@ -1361,16 +1378,10 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_rule(c, sig_x1, sig_y, sig_x2, sig_y, color=BLACK, lw=0.7)
 
     c.saveState()
-    c.setStrokeColor(TEXT)
-    c.setLineWidth(0.9)
-    path = c.beginPath()
-    sx, sy2 = sig_x1 + 8, sig_y + 7
-    path.moveTo(sx, sy2)
-    path.curveTo(sx + 10, sy2 + 7, sx + 24, sy2 - 6, sx + 38, sy2 + 5)
-    path.curveTo(sx + 48, sy2 + 13, sx + 62, sy2 - 2, sx + 76, sy2 + 8)
-    path.curveTo(sx + 88, sy2 + 15, sx + 104, sy2 + 1, sx + 122, sy2 + 10)
-    path.curveTo(sx + 138, sy2 + 18, sx + 156, sy2 - 3, sx + 174, sy2 + 6)
-    c.drawPath(path, stroke=1, fill=0)
+    c.saveState()
+    c.setFont("Times-Italic", 20)
+    c.setFillColor(TEXT)
+    c.drawString(sig_x1 + 10, sig_y + 4, _signature_initials(paystub))
     c.restoreState()
 
     draw_text(c, sig_x1 + 8, sig_y - 7, "AUTHORIZED SIGNATURE", size=5, color=TEXT)

@@ -527,7 +527,10 @@ class TemplateRendererTests(unittest.TestCase):
         self.assertNotIn("NON-NEGOTIABLE", text)
         self.assertNotIn("BANK NAME", text)
         self.assertNotIn("CITY, STATE ZIP", text)
-        self.assertNotIn("OTHER BENEFITS AND INFORMATION", text)
+        self.assertIn("OTHER BENEFITS AND INFORMATION", text)
+        self.assertIn("IMPORTANT NOTES", text)
+        self.assertNotIn("No employer-paid items", text)
+        self.assertNotIn("No additional notes.", text)
 
 
 class ProfileStoreTests(unittest.TestCase):
