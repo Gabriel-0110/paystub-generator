@@ -152,7 +152,7 @@ function cache() {
   els.generationAnchor = document.getElementById("generation_anchor");
   els.generationAmountMode = document.getElementById("generation_amount_mode");
   els.generationFixedAmount = document.getElementById("generation_fixed_amount");
-  els.generationManualAmounts = document.getElementById("generation_manual_amounts");
+  els.generationManualAmountsList = document.getElementById("generation_manual_amounts_list");
   els.generationPlanSummary = document.getElementById("generation-plan-summary");
   els.profileSummary = document.getElementById("profile-summary");
   els.assignmentSelect = document.getElementById("assignment-select");
@@ -218,7 +218,7 @@ function bind() {
     persistDraft();
   });
 
-  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor, els.generationAmountMode, els.generationFixedAmount, els.generationManualAmounts].forEach((field) => {
+  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor, els.generationAmountMode, els.generationFixedAmount].forEach((field) => {
     field.addEventListener("change", handleGenerationInput);
     field.addEventListener("input", handleGenerationInput);
   });
@@ -513,6 +513,17 @@ function buildGenerationPlan() {
 function handleInput(event) {
   const target = event.target;
   if (!(target instanceof HTMLElement) || !state.paystub) return;
+  if (target.dataset.generationManualIndex !== undefined) {
+    const amounts = manualAmountsForCount(state.generationStubCount);
+    amounts[Number(target.dataset.generationManualIndex)] = numberValue(target.value);
+    state.generationManualAmountsText = amounts.join("\n");
+    state.previewStale = Boolean(state.preview);
+    clearFieldError("generation_manual_amounts");
+    persistDraft();
+    renderPreview();
+    renderForm();
+    return;
+  }
   const { section, index, prop, type } = target.dataset;
   if (section && index !== undefined && prop) {
     if (section === "source_earnings" || section === "source_deductions") {
@@ -977,14 +988,12 @@ function renderForm() {
   els.generationAnchor.value = state.generationAnchor;
   els.generationAmountMode.value = state.generationAmountMode;
   els.generationFixedAmount.value = String(state.generationFixedAmount ?? 0);
-  els.generationManualAmounts.value = state.generationManualAmountsText || "";
   els.generationPayFrequency.disabled = state.generationMode === "single" || state.generationSequenceType === "weekly";
   els.generationStubCount.value = String(state.generationMode === "multiple" ? state.generationStubCount : 1);
   els.generationStubCount.disabled = state.generationMode === "single";
   els.generationAnchor.disabled = state.generationMode === "single";
   els.generationAmountMode.disabled = state.generationMode === "single";
   els.generationFixedAmount.disabled = state.generationMode === "single" || state.generationAmountMode !== "fixed";
-  els.generationManualAmounts.disabled = state.generationMode === "single" || state.generationAmountMode !== "manual";
   els.generateButton.textContent = state.generationMode === "multiple" ? "Generate Batch ZIP" : "Generate PDF";
   document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-frequency-field")?.toggleAttribute(
@@ -996,6 +1005,7 @@ function renderForm() {
   document.getElementById("generation-amount-mode-field")?.toggleAttribute("hidden", state.generationMode === "single");
   document.getElementById("generation-fixed-amount-field")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "fixed");
   document.getElementById("generation-manual-amounts-shell")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "manual");
+  renderManualAmountInputs();
   renderGenerationPlanSummary();
 
   renderComputedTaxLines();
@@ -1809,6 +1819,49 @@ function parseManualAmounts(value) {
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => numberValue(item));
+}
+
+function manualAmountsForCount(count) {
+  const normalizedCount = Math.max(0, Number(count || 0));
+  const amounts = parseManualAmounts(state.generationManualAmountsText);
+  while (amounts.length < normalizedCount) amounts.push(0);
+  return amounts.slice(0, normalizedCount);
+}
+
+function renderManualAmountInputs() {
+  if (!els.generationManualAmountsList) return;
+  if (state.generationMode !== "multiple" || state.generationAmountMode !== "manual") {
+    els.generationManualAmountsList.innerHTML = "";
+    return;
+  }
+  const amounts = manualAmountsForCount(state.generationStubCount);
+  const entries = state.preview?.generation_plan?.entries || [];
+  els.generationManualAmountsList.innerHTML = amounts.map((amount, index) => {
+    const entry = entries[index];
+    const label = entry
+      ? `Stub ${entry.sequence_number} · ${entry.pay_period_start} to ${entry.pay_period_end} · pay ${entry.pay_date}`
+      : `Stub ${index + 1}`;
+    return `
+      <div class="line-item">
+        <div class="line-item-head">
+          <span class="line-item-title">${escapeHtml(label)}</span>
+        </div>
+        <div class="line-item-grid is-compact">
+          <label class="field field-inline">
+            <span>Gross amount</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              data-generation-manual-index="${index}"
+              value="${escapeHtml(String(amount || ""))}"
+            />
+          </label>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function table(title, headers, rows) {

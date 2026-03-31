@@ -167,12 +167,12 @@
                 </label>
               </div>
               <div id="generation-manual-amounts-shell" class="generation-manual-shell" hidden>
-                <label class="field">
+                <div class="field">
                   <span>Manual gross amounts</span>
-                  <textarea id="generation_manual_amounts" name="generation_manual_amounts" rows="4" placeholder="One amount per line"></textarea>
-                  <small class="field-hint">Enter one gross amount per stub in order, one per line.</small>
+                  <div id="generation_manual_amounts_list" class="repeater-list secondary-list"></div>
+                  <small class="field-hint">Set each generated stub amount directly. The labels update from the preview schedule.</small>
                   <small id="generation_manual_amounts-error" class="field-error" data-for="generation_manual_amounts" role="alert" aria-live="polite"></small>
-                </label>
+                </div>
               </div>
               <div id="generation-plan-summary" class="generation-plan-summary" aria-live="polite"></div>
             </fieldset>
