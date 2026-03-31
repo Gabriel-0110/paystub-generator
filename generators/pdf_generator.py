@@ -199,6 +199,56 @@ def _signature_initials(paystub: Paystub) -> str:
     return monogram or "AA"
 
 
+def _draw_handwritten_signature(c, x: float, y: float, initials: str):
+    """Draw a cursive handwritten-style signature using bezier curves."""
+    c.saveState()
+    c.setStrokeColor(colors.HexColor("#1a1a1a"))
+    c.setFillColor(colors.HexColor("#1a1a1a"))
+    c.setLineWidth(0.7)
+    c.setLineCap(1)  # round caps
+    c.setLineJoin(1)  # round joins
+
+    p = c.beginPath()
+
+    # First letter stroke — cursive "A" shape
+    # Upstroke
+    p.moveTo(x, y)
+    p.curveTo(x + 2, y + 6, x + 5, y + 18, x + 9, y + 22)
+    # Peak and downstroke
+    p.curveTo(x + 12, y + 24, x + 14, y + 22, x + 18, y + 2)
+    # Crossbar swoop
+    p.curveTo(x + 18, y + 1, x + 6, y + 9, x + 4, y + 10)
+    p.curveTo(x + 8, y + 10, x + 16, y + 8, x + 20, y + 6)
+    c.drawPath(p, stroke=1, fill=0)
+
+    # Connecting flourish to second letter
+    p2 = c.beginPath()
+    p2.moveTo(x + 20, y + 6)
+    p2.curveTo(x + 22, y + 4, x + 24, y + 2, x + 26, y + 1)
+    p2.curveTo(x + 28, y + 0, x + 29, y + 2, x + 30, y + 4)
+    c.drawPath(p2, stroke=1, fill=0)
+
+    # Second letter stroke — cursive "A"
+    ox = x + 28
+    p3 = c.beginPath()
+    p3.moveTo(ox, y + 2)
+    p3.curveTo(ox + 2, y + 8, ox + 5, y + 18, ox + 9, y + 22)
+    p3.curveTo(ox + 12, y + 24, ox + 14, y + 20, ox + 17, y + 2)
+    # Crossbar swoop
+    p3.curveTo(ox + 17, y + 1, ox + 6, y + 9, ox + 4, y + 10)
+    p3.curveTo(ox + 8, y + 10, ox + 16, y + 8, ox + 20, y + 6)
+    c.drawPath(p3, stroke=1, fill=0)
+
+    # Tail flourish
+    p4 = c.beginPath()
+    p4.moveTo(ox + 20, y + 6)
+    p4.curveTo(ox + 24, y + 3, ox + 30, y - 2, ox + 36, y - 4)
+    p4.curveTo(ox + 38, y - 4, ox + 32, y - 2, ox + 28, y + 0)
+    c.drawPath(p4, stroke=1, fill=0)
+
+    c.restoreState()
+
+
 def _barcode_digits(paystub: Paystub) -> str:
     seed = f"{paystub.employee_id}|{paystub.pay_date}|{paystub.payroll_check_number}|{paystub.net_pay_current}"
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()
@@ -972,9 +1022,8 @@ def _render_simple_stub(c: canvas.Canvas, paystub: Paystub) -> None:
     info_gap = 8
     info_w = (width - info_gap * 3) / 4
     emp_label = "Employee"
-    if paystub.employee_title:
-        emp_label = f"Employee · {paystub.employee_title}"
-    draw_form_field(c, margin, info_top, info_w, 44, emp_label, paystub.employee_name.upper(), max_value_lines=2)
+    emp_secondary = paystub.employee_title if paystub.employee_title else None
+    draw_form_field(c, margin, info_top, info_w, 44, emp_label, paystub.employee_name.upper(), secondary=emp_secondary, max_value_lines=2)
     draw_form_field(c, margin + info_w + info_gap, info_top, info_w, 44, "Employee ID", paystub.employee_id, max_value_lines=1)
     draw_form_field(c, margin + (info_w + info_gap) * 2, info_top, info_w, 44, "Pay Date", paystub.pay_date, max_value_lines=1)
     draw_form_field(
@@ -1073,9 +1122,8 @@ def _render_adp_like_statement(c: canvas.Canvas, paystub: Paystub) -> None:
     block_gap = 8
     block_w = (width - block_gap * 2) / 3
     emp_label2 = "Employee"
-    if paystub.employee_title:
-        emp_label2 = f"Employee · {paystub.employee_title}"
-    draw_form_field(c, margin, block_top, block_w, 46, emp_label2, paystub.employee_name.upper(), max_value_lines=2)
+    emp_secondary2 = paystub.employee_title if paystub.employee_title else None
+    draw_form_field(c, margin, block_top, block_w, 46, emp_label2, paystub.employee_name.upper(), secondary=emp_secondary2, max_value_lines=2)
     draw_form_field(c, margin + block_w + block_gap, block_top, block_w, 46, "Pay Date", paystub.pay_date, max_value_lines=1)
     draw_form_field(c, margin + (block_w + block_gap) * 2, block_top, block_w, 46, "Pay Period", f"{paystub.pay_period_start} to {paystub.pay_period_end}", value_size=7.6)
 
@@ -1194,10 +1242,20 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, right_block_x, top_y - 50, "Pay date:", size=6.6, color=TEXT)
     draw_right(c, right_block_x + 110, top_y - 50, paystub.pay_date, size=6.6, color=TEXT)
     emp_name_line = paystub.employee_name.upper()
+    draw_wrapped_text(c, right_block_x, top_y - 70, right_block_w, emp_name_line, size=8.8, bold=True, color=TEXT, leading=9, max_lines=2)
+    title_offset = 0
     if paystub.employee_title:
-        emp_name_line += f"  ·  {paystub.employee_title.upper()}"
-    draw_wrapped_text(c, right_block_x, top_y - 70, right_block_w, emp_name_line, size=8.8, bold=True, color=TEXT, leading=9, max_lines=3)
-    draw_wrapped_text(c, right_block_x, top_y - 96, right_block_w, (_format_address(paystub.employee_address) or "NOT PROVIDED").upper(), size=7.6, bold=True, color=TEXT, leading=8.5, max_lines=3)
+        draw_text(c, right_block_x, top_y - 84, paystub.employee_title.upper(), size=6.6, color=TEXT)
+        title_offset = 10
+    draw_wrapped_text(c, right_block_x, top_y - 86 - title_offset, right_block_w, (_format_address(paystub.employee_address) or "NOT PROVIDED").upper(), size=7.6, bold=True, color=TEXT, leading=8.5, max_lines=3)
+
+    # Company logo on the left side, below company address, above SSN
+    custom_logo = paystub.company_logo if paystub.company_logo and paystub.company_logo.strip() else ""
+    if custom_logo:
+        company_logo_img = _resolve_logo(custom_logo)
+        if company_logo_img:
+            logo_left_size = 36
+            c.drawImage(company_logo_img, left_text_x, top_y - 90, logo_left_size, logo_left_size, preserveAspectRatio=True, mask="auto")
 
     tax_y = top_y - 102
     draw_text(c, left_text_x, tax_y, f"Social Security Number: {paystub.social_security_number or 'Not provided'}", size=6.4, color=TEXT)
@@ -1390,11 +1448,7 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     sig_y = ck_y + 38
     draw_rule(c, sig_x1, sig_y, sig_x2, sig_y, color=BLACK, lw=0.7)
 
-    c.saveState()
-    c.setFont("Times-Italic", 20)
-    c.setFillColor(TEXT)
-    c.drawString(sig_x1 + 10, sig_y + 4, _signature_initials(paystub))
-    c.restoreState()
+    _draw_handwritten_signature(c, sig_x1 + 10, sig_y + 4, _signature_initials(paystub))
 
     # Bank info — bottom-left of check
     bank_y = ck_y + 30
