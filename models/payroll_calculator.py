@@ -271,7 +271,12 @@ class EmployeePayConfig:
     employee_id:            str
     employee_name:          str
     employee_address:       str
-    social_security_number: str
+    bank_name:              str = ""
+    deposit_account_type:   str = ""
+    routing_number:         str = ""
+    account_number:         str = ""
+    direct_deposit_amount:  float = 0.0
+    social_security_number: str = ""
 
     # Employer
     company_name:    str
@@ -495,6 +500,11 @@ def compute_paystub_data(
         "employee_name":           config.employee_name,
         "employee_address":        config.employee_address,
         "employee_id":             config.employee_id,
+        "bank_name":               config.bank_name,
+        "deposit_account_type":    config.deposit_account_type,
+        "routing_number":          config.routing_number,
+        "account_number":          config.account_number,
+        "direct_deposit_amount":   round(config.direct_deposit_amount, 2),
         # Dates
         "pay_date":                pay_date.strftime("%Y-%m-%d"),
         "pay_period_start":        pay_period_start.strftime("%Y-%m-%d"),

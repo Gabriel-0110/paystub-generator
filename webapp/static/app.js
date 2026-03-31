@@ -12,6 +12,7 @@ const FIELD_LABELS = {
   company_address: "Company address",
   employee_name: "Employee name",
   employee_id: "Employee ID",
+  bank_name: "Bank name",
   taxable_marital_status: "Tax filing status",
   work_state: "Work state",
   pay_frequency: "Pay frequency",
@@ -61,6 +62,7 @@ const EARNING_LABEL_OPTIONS = ["Regular", "Overtime", "Double Time", "Bonus", "C
 const DEDUCTION_LABEL_OPTIONS = ["401(k)", "HSA", "FSA", "Health Insurance", "Dental Insurance", "Vision Insurance", "Union Dues", "Wage Garnishment", "Child Support", "Loan Repayment", "Transit", "Parking"];
 const ADJUSTMENT_LABEL_OPTIONS = ["Reimbursement", "Correction", "Advance Repayment", "Uniform", "Travel", "Meal", "Miscellaneous"];
 const BENEFIT_LABEL_OPTIONS = ["PTO Balance", "Sick Balance", "Vacation Balance", "Employer HSA", "Employer 401(k)", "Life Insurance", "Wellness"];
+const ACCOUNT_TYPE_OPTIONS = ["checking", "savings"];
 
 const state = {
   emptyPaystub: null,
@@ -614,6 +616,11 @@ function renderProfileEditorForm() {
           ${profileScalarField("employee_name", "Employee name", { wide: true })}
           ${profileScalarField("social_security_number", "Social Security number")}
           ${profileScalarField("employee_address", "Employee address", { as: "textarea", wide: true })}
+          ${profileScalarField("bank_name", "Bank name")}
+          ${profileScalarField("deposit_account_type", "Account type", { as: "select", options: ["", ...ACCOUNT_TYPE_OPTIONS] })}
+          ${profileScalarField("routing_number", "Routing number")}
+          ${profileScalarField("account_number", "Account number")}
+          ${profileScalarField("direct_deposit_amount", "Direct deposit amount", { type: "number" })}
         </div>
       </section>
       ${renderProfileObjectList("earnings", "Earnings", [["label", "Label", "select"], ["rate", "Rate", "number"], ["hours", "Hours", "number"], ["flat_amount", "Flat amount", "number"]], "Add earning")}
@@ -906,6 +913,10 @@ function renderForm() {
     "employee_name",
     "employee_address",
     "employee_id",
+    "bank_name",
+    "deposit_account_type",
+    "routing_number",
+    "account_number",
     "work_state",
     "pay_frequency",
     "pay_date",
@@ -920,7 +931,7 @@ function renderForm() {
     const field = document.getElementById(name);
     if (field) field.value = state.paystub[name] || "";
   });
-  ["allowances_count", "additional_federal_withholding", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours"].forEach((name) => {
+  ["allowances_count", "additional_federal_withholding", "annual_salary", "weekly_hours", "hourly_rate", "regular_hours", "direct_deposit_amount"].forEach((name) => {
     const field = document.getElementById(name);
     if (field) field.value = String(state.paystub[name] ?? 0);
   });
@@ -1482,6 +1493,7 @@ function renderPreview() {
       ${meta("Employee ID", escapeHtml(paystub.employee_id || "Not provided"))}
       ${meta("Pay date", escapeHtml(paystub.pay_date || "Not provided"))}
       ${meta("Pay period", escapeHtml(`${paystub.pay_period_start || "—"} to ${paystub.pay_period_end || "—"}`))}
+      ${meta("Deposit", escapeHtml(depositSummary(paystub)))}
       ${meta("YTD gross", currency(summary.gross_pay_ytd))}
       ${meta("YTD net", currency(summary.net_pay_ytd))}
     </div>
@@ -1536,6 +1548,8 @@ function buildSubmissionPaystub() {
     paystub[section] = (paystub[section] || []).filter((row) => !isBlankRow(section, row));
   });
   if (paystub.draft_mode) {
+    paystub.auto_calculate_taxes = true;
+    paystub.auto_add_state_deductions = false;
     paystub.taxes = [];
     paystub.earnings = [];
     paystub.deductions = [];
@@ -1710,6 +1724,28 @@ function meta(label, value) {
   return `<div class="meta-card"><span>${escapeHtml(label)}</span><strong>${value}</strong></div>`;
 }
 
+function maskAccountNumber(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "Not provided";
+  return `••••${digits.slice(-4)}`;
+}
+
+function depositSummary(paystub) {
+  const parts = [];
+  if (paystub.bank_name) parts.push(paystub.bank_name);
+  if (paystub.deposit_account_type) {
+    parts.push(paystub.deposit_account_type.charAt(0).toUpperCase() + paystub.deposit_account_type.slice(1));
+  }
+  if (paystub.routing_number) parts.push(`Routing ${paystub.routing_number}`);
+  if (paystub.account_number) parts.push(`Acct ${maskAccountNumber(paystub.account_number)}`);
+  if (numberValue(paystub.direct_deposit_amount) > 0) {
+    parts.push(currency(numberValue(paystub.direct_deposit_amount)));
+  } else if (parts.length) {
+    parts.push("Full net pay");
+  }
+  return parts.join(" · ") || "Not provided";
+}
+
 function table(title, headers, rows) {
   if (!rows.length) return `<div class="preview-table"><span class="table-caption">${escapeHtml(title)}</span><p>No entries.</p></div>`;
   return `
@@ -1858,6 +1894,11 @@ async function loadGuidedEmployeeProfile() {
     state.paystub.employee_name = record.employee_name || "";
     state.paystub.employee_id = record.employee_id || "";
     state.paystub.employee_address = record.employee_address || "";
+    state.paystub.bank_name = record.bank_name || "";
+    state.paystub.deposit_account_type = record.deposit_account_type || "";
+    state.paystub.routing_number = record.routing_number || "";
+    state.paystub.account_number = record.account_number || "";
+    state.paystub.direct_deposit_amount = numberValue(record.direct_deposit_amount);
     state.paystub.social_security_number = record.social_security_number || "";
     state.paystub.other_benefits = [];
     state.paystub.important_notes = record.important_notes || [];
@@ -1960,6 +2001,11 @@ async function saveCurrentEmployeeProfile() {
     employee_id: state.paystub.employee_id || "",
     employee_name: state.paystub.employee_name || "",
     employee_address: state.paystub.employee_address || "",
+    bank_name: state.paystub.bank_name || "",
+    deposit_account_type: state.paystub.deposit_account_type || "",
+    routing_number: state.paystub.routing_number || "",
+    account_number: state.paystub.account_number || "",
+    direct_deposit_amount: numberValue(state.paystub.direct_deposit_amount),
     social_security_number: state.paystub.social_security_number || "",
     earnings,
     other_benefits: state.paystub.other_benefits || [],

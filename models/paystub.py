@@ -46,6 +46,12 @@ class Paystub(BaseModel):
     pay_period_start: str
     pay_period_end: str
 
+    bank_name: str = ""
+    deposit_account_type: str = ""
+    routing_number: str = ""
+    account_number: str = ""
+    direct_deposit_amount: float = 0.0
+
     social_security_number: str = ""
     taxable_marital_status: str = ""
     exemptions_allowances: str = ""
@@ -62,7 +68,7 @@ class Paystub(BaseModel):
     regular_hours: float = 0.0
     draft_mode: bool = False
     auto_calculate_taxes: bool = True
-    auto_add_state_deductions: bool = True
+    auto_add_state_deductions: bool = False
 
     source_earnings: List[DraftEarningItem] = Field(default_factory=list)
     source_deductions: List[DraftDeductionItem] = Field(default_factory=list)

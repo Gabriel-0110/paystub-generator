@@ -46,6 +46,11 @@ class EmployeeProfile:
     employee_id: str
     employee_name: str
     employee_address: str = ""
+    bank_name: str = ""
+    deposit_account_type: str = ""
+    routing_number: str = ""
+    account_number: str = ""
+    direct_deposit_amount: float = 0.0
     social_security_number: str = ""
     earnings: list[EarningLine] = field(default_factory=list)
     other_benefits: list[BenefitLine] = field(default_factory=list)
@@ -212,6 +217,11 @@ def build_employee_pay_config(
         employee_id=employee.employee_id,
         employee_name=employee.employee_name,
         employee_address=employee.employee_address,
+        bank_name=employee.bank_name,
+        deposit_account_type=employee.deposit_account_type,
+        routing_number=employee.routing_number,
+        account_number=employee.account_number,
+        direct_deposit_amount=employee.direct_deposit_amount,
         social_security_number=employee.social_security_number,
         company_name=company.company_name,
         company_address=company.company_address,
@@ -254,6 +264,11 @@ def split_employee_pay_config(
         employee_id=config.employee_id,
         employee_name=config.employee_name,
         employee_address=config.employee_address,
+        bank_name=config.bank_name,
+        deposit_account_type=config.deposit_account_type,
+        routing_number=config.routing_number,
+        account_number=config.account_number,
+        direct_deposit_amount=config.direct_deposit_amount,
         social_security_number=config.social_security_number,
         earnings=[EarningLine(**asdict(item)) for item in config.earnings],
         other_benefits=[BenefitLine(**asdict(item)) for item in config.other_benefits],

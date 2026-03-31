@@ -225,7 +225,7 @@ class YTDEngineTests(unittest.TestCase):
         self.assertLess(schedule["periods"][0]["pay_date"], schedule["periods"][-1]["pay_date"])
         self.assertEqual(schedule["summary"]["anchor"], "latest")
 
-    def test_guided_draft_preview_calculates_taxes_and_ny_pfl(self) -> None:
+    def test_guided_draft_preview_calculates_taxes_without_extra_deductions(self) -> None:
         draft = web_service.empty_paystub_payload()
         draft.update(
             {
@@ -251,7 +251,8 @@ class YTDEngineTests(unittest.TestCase):
         self.assertEqual(preview["summary"]["gross_pay_current"], 2000.0)
         self.assertIn("Federal Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
         self.assertIn("NY State Income Tax", [item["label"] for item in preview["paystub"]["taxes"]])
-        self.assertIn("NY Paid Family Leave", [item["label"] for item in preview["paystub"]["deductions"]])
+        self.assertEqual(preview["paystub"]["deductions"], [])
+        self.assertEqual(preview["paystub"]["other_benefits"], [])
 
     def test_guided_salary_draft_derives_hourly_rate_from_annual_salary_and_weekly_hours(self) -> None:
         draft = web_service.empty_paystub_payload()
@@ -522,6 +523,11 @@ class ProfileIOTests(unittest.TestCase):
                 employee_id="EMP-2001",
                 employee_name="Jane Doe",
                 employee_address="100 OAK AVE\nMETROPOLIS, USA 10002",
+                bank_name="Metro Credit Union",
+                deposit_account_type="checking",
+                routing_number="021000021",
+                account_number="9876543210",
+                direct_deposit_amount=1200.0,
                 social_security_number="111-22-3333",
                 earnings=[EarningLine(label="Regular", rate=40.0, hours=80.0)],
                 other_benefits=[BenefitLine(label="PTO Hrs", current=8.0, ytd=8.0)],
@@ -789,6 +795,8 @@ class WebAppTests(unittest.TestCase):
                 load_payload = load.json()
                 self.assertEqual(load_payload["paystub"]["employee_name"], "Jane Doe")
                 self.assertEqual(load_payload["paystub"]["payroll_check_number"], "000000321")
+                self.assertEqual(load_payload["paystub"]["bank_name"], "Metro Credit Union")
+                self.assertEqual(load_payload["paystub"]["deposit_account_type"], "checking")
                 self.assertGreater(load_payload["preview"]["summary"]["net_pay_current"], 0)
 
     def test_profile_export_and_import_routes_round_trip_json(self) -> None:

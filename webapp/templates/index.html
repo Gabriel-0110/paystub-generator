@@ -249,6 +249,38 @@
                   </label>
                 </div>
               </div>
+              <div class="section-grid three-up">
+                <label class="field">
+                  <span>Bank name</span>
+                  <input id="bank_name" name="bank_name" autocomplete="organization" aria-describedby="bank_name-error" />
+                  <small id="bank_name-error" class="field-error" data-for="bank_name" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Account type</span>
+                  <select id="deposit_account_type" name="deposit_account_type" aria-describedby="deposit_account_type-error">
+                    <option value="">Not set</option>
+                    <option value="checking">Checking</option>
+                    <option value="savings">Savings</option>
+                  </select>
+                  <small id="deposit_account_type-error" class="field-error" data-for="deposit_account_type" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Direct deposit amount</span>
+                  <input id="direct_deposit_amount" name="direct_deposit_amount" type="number" min="0" step="0.01" inputmode="decimal" aria-describedby="direct_deposit_amount-error" />
+                  <small class="field-hint">Leave at `0.00` to deposit the full net pay.</small>
+                  <small id="direct_deposit_amount-error" class="field-error" data-for="direct_deposit_amount" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Routing number</span>
+                  <input id="routing_number" name="routing_number" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="routing_number-error" />
+                  <small id="routing_number-error" class="field-error" data-for="routing_number" role="alert" aria-live="polite"></small>
+                </label>
+                <label class="field">
+                  <span>Account number</span>
+                  <input id="account_number" name="account_number" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="account_number-error" />
+                  <small id="account_number-error" class="field-error" data-for="account_number" role="alert" aria-live="polite"></small>
+                </label>
+              </div>
             </fieldset>
 
             <fieldset class="form-section">
@@ -348,7 +380,7 @@
               <div class="repeater-head">
                 <div>
                   <h3>Step 6 · Deductions</h3>
-                  <p>Required New York deductions are added automatically when applicable. Add any extra employee deductions below.</p>
+                  <p>Leave this section empty unless you need a deduction line. Only deductions you add here will appear on the stub.</p>
                 </div>
                 <button type="button" class="ghost-button" data-action="add-row" data-section="source_deductions">Add deduction</button>
               </div>

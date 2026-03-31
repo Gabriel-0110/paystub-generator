@@ -202,6 +202,13 @@ def _address_lines(value: str, *, max_lines: int | None = None) -> list[str]:
     return lines
 
 
+def _masked_account(value: str) -> str:
+    digits = "".join(char for char in str(value or "") if char.isdigit())
+    if not digits:
+        return ""
+    return f"XXXX{digits[-4:]}"
+
+
 def _coerced_font_size(size: float) -> float:
     return round(float(size), 2)
 
@@ -1297,6 +1304,20 @@ def _render_detached_check(c: canvas.Canvas, paystub: Paystub) -> None:
     draw_text(c, div_x + 110, ck_y + ck_h - 29, paystub.social_security_number, size=6, color=TEXT)
     draw_text(c, div_x + 8, ck_y + ck_h - 39, "Net pay:", size=6, bold=True, color=TEXT)
     draw_text(c, div_x + 110, ck_y + ck_h - 39, money(paystub.net_pay_current), size=6, bold=True, color=INK)
+    if paystub.bank_name:
+        draw_text(c, div_x + 8, ck_y + ck_h - 49, "Bank:", size=6, bold=True, color=TEXT)
+        draw_fit_text(c, div_x + 110, ck_y + ck_h - 49, 96, paystub.bank_name, size=6, min_size=5.2, color=TEXT)
+    if paystub.deposit_account_type or paystub.account_number:
+        draw_text(c, div_x + 8, ck_y + ck_h - 59, "Deposit:", size=6, bold=True, color=TEXT)
+        deposit_bits = []
+        if paystub.deposit_account_type:
+            deposit_bits.append(str(paystub.deposit_account_type).title())
+        if paystub.account_number:
+            deposit_bits.append(_masked_account(paystub.account_number))
+        draw_fit_text(c, div_x + 110, ck_y + ck_h - 59, 96, " ".join(deposit_bits), size=6, min_size=5.2, color=TEXT)
+    if paystub.routing_number:
+        draw_text(c, div_x + 8, ck_y + ck_h - 69, "Routing:", size=6, bold=True, color=TEXT)
+        draw_text(c, div_x + 110, ck_y + ck_h - 69, str(paystub.routing_number), size=6, color=TEXT)
 
     body_top = ck_y + ck_h - strip_h
 
