@@ -23,85 +23,189 @@ class FilingStatus(str, Enum):
     HEAD_OF_HOUSEHOLD  = "Head of Household"
 
 
-# ── 2026 Federal tax constants (estimated) ────────────────────────────────────
+# ── Tax year support ───────────────────────────────────────────────────────────
 
-# Standard deductions 2026 (official IRS)
-_STD_DEDUCTION: dict[FilingStatus, float] = {
-    FilingStatus.SINGLE:            16_100,
-    FilingStatus.MARRIED:           32_200,
-    FilingStatus.HEAD_OF_HOUSEHOLD: 24_150,
+SUPPORTED_TAX_YEARS: tuple[int, ...] = (2025, 2026)
+_DEFAULT_TAX_YEAR: int = 2026
+
+
+def _resolve_tax_year(year: int | None) -> int:
+    """Return *year* if it has a tax table, otherwise fall back to the default."""
+    if year in SUPPORTED_TAX_YEARS:
+        return year
+    return _DEFAULT_TAX_YEAR
+
+
+# ── Federal standard deductions ───────────────────────────────────────────────
+
+_STD_DEDUCTION: dict[int, dict[FilingStatus, float]] = {
+    2025: {
+        FilingStatus.SINGLE:            15_750,
+        FilingStatus.MARRIED:           31_500,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 23_625,
+    },
+    2026: {
+        FilingStatus.SINGLE:            16_100,
+        FilingStatus.MARRIED:           32_200,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 24_150,
+    },
 }
 
+# ── Federal income tax brackets ───────────────────────────────────────────────
 # (lower, upper, marginal_rate) — income above lower up to upper is taxed at rate
-_FEDERAL_BRACKETS: dict[FilingStatus, list[tuple[float, float, float]]] = {
-    FilingStatus.SINGLE: [
-        (0,        12_400,  0.10),
-        (12_400,   50_400,  0.12),
-        (50_400,  105_700,  0.22),
-        (105_700, 201_775,  0.24),
-        (201_775, 256_225,  0.32),
-        (256_225, 640_600,  0.35),
-        (640_600, float("inf"), 0.37),
+
+_FEDERAL_BRACKETS: dict[int, dict[FilingStatus, list[tuple[float, float, float]]]] = {
+    2025: {
+        FilingStatus.SINGLE: [
+            (0,        11_925,  0.10),
+            (11_925,   48_475,  0.12),
+            (48_475,  103_350,  0.22),
+            (103_350, 197_300,  0.24),
+            (197_300, 250_525,  0.32),
+            (250_525, 626_350,  0.35),
+            (626_350, float("inf"), 0.37),
+        ],
+        FilingStatus.MARRIED: [
+            (0,        23_850,  0.10),
+            (23_850,   96_950,  0.12),
+            (96_950,  206_700,  0.22),
+            (206_700, 394_600,  0.24),
+            (394_600, 501_050,  0.32),
+            (501_050, 751_600,  0.35),
+            (751_600, float("inf"), 0.37),
+        ],
+        FilingStatus.HEAD_OF_HOUSEHOLD: [
+            (0,        17_000,  0.10),
+            (17_000,   64_850,  0.12),
+            (64_850,  103_350,  0.22),
+            (103_350, 197_300,  0.24),
+            (197_300, 250_500,  0.32),
+            (250_500, 626_350,  0.35),
+            (626_350, float("inf"), 0.37),
+        ],
+    },
+    2026: {
+        FilingStatus.SINGLE: [
+            (0,        12_400,  0.10),
+            (12_400,   50_400,  0.12),
+            (50_400,  105_700,  0.22),
+            (105_700, 201_775,  0.24),
+            (201_775, 256_225,  0.32),
+            (256_225, 640_600,  0.35),
+            (640_600, float("inf"), 0.37),
+        ],
+        FilingStatus.MARRIED: [
+            (0,        24_800,  0.10),
+            (24_800,  100_800,  0.12),
+            (100_800, 211_400,  0.22),
+            (211_400, 403_550,  0.24),
+            (403_550, 512_450,  0.32),
+            (512_450, 768_700,  0.35),
+            (768_700, float("inf"), 0.37),
+        ],
+        FilingStatus.HEAD_OF_HOUSEHOLD: [
+            (0,        17_700,  0.10),
+            (17_700,   67_450,  0.12),
+            (67_450,  105_700,  0.22),
+            (105_700, 201_750,  0.24),
+            (201_750, 256_200,  0.32),
+            (256_200, 640_600,  0.35),
+            (640_600, float("inf"), 0.37),
+        ],
+    },
+}
+
+# ── FICA constants ────────────────────────────────────────────────────────────
+
+_SS_RATE:        dict[int, float] = {2025: 0.0620, 2026: 0.0620}
+_SS_WAGE_BASE:   dict[int, float] = {2025: 176_100.0, 2026: 184_500.0}
+_MEDICARE_RATE:  dict[int, float] = {2025: 0.0145, 2026: 0.0145}
+_MEDICARE_ADDL_RATE: dict[int, float] = {2025: 0.0090, 2026: 0.0090}
+_MEDICARE_ADDL_THRESHOLD: dict[int, dict[FilingStatus, float]] = {
+    2025: {
+        FilingStatus.SINGLE:            200_000,
+        FilingStatus.MARRIED:           250_000,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 200_000,
+    },
+    2026: {
+        FilingStatus.SINGLE:            200_000,
+        FilingStatus.MARRIED:           250_000,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 200_000,
+    },
+}
+
+# Backward-compatible aliases (default to current tax year)
+SS_RATE:             float = _SS_RATE[_DEFAULT_TAX_YEAR]
+SS_WAGE_BASE:        float = _SS_WAGE_BASE[_DEFAULT_TAX_YEAR]
+MEDICARE_RATE:       float = _MEDICARE_RATE[_DEFAULT_TAX_YEAR]
+MEDICARE_ADDL_RATE:  float = _MEDICARE_ADDL_RATE[_DEFAULT_TAX_YEAR]
+
+# ── New York State brackets ───────────────────────────────────────────────────
+
+_NY_BRACKETS_SINGLE: dict[int, list[tuple[float, float, float]]] = {
+    2025: [
+        (0,           8_500, 0.0400),
+        (8_500,      11_700, 0.0450),
+        (11_700,     13_900, 0.0525),
+        (13_900,     80_650, 0.0550),
+        (80_650,    215_400, 0.0600),
+        (215_400, 1_077_550, 0.0685),
+        (1_077_550, 5_000_000, 0.0965),
+        (5_000_000, 25_000_000, 0.1030),
+        (25_000_000, float("inf"), 0.1090),
     ],
-    FilingStatus.MARRIED: [
-        (0,        24_800,  0.10),
-        (24_800,  100_800,  0.12),
-        (100_800, 211_400,  0.22),
-        (211_400, 403_550,  0.24),
-        (403_550, 512_450,  0.32),
-        (512_450, 768_700,  0.35),
-        (768_700, float("inf"), 0.37),
-    ],
-    FilingStatus.HEAD_OF_HOUSEHOLD: [
-        (0,        17_700,  0.10),
-        (17_700,   67_450,  0.12),
-        (67_450,  105_700,  0.22),
-        (105_700, 201_750,  0.24),
-        (201_750, 256_200,  0.32),
-        (256_200, 640_600,  0.35),
-        (640_600, float("inf"), 0.37),
+    2026: [
+        (0,          17_650, 0.0400),
+        (17_650,     24_300, 0.0450),
+        (24_300,     28_700, 0.0525),
+        (28_700,    166_050, 0.0585),
+        (166_050,   332_175, 0.0625),
+        (332_175, 2_218_185, 0.0685),
+        (2_218_185, float("inf"), 0.1090),
     ],
 }
 
-# FICA 2026
-SS_RATE:             float = 0.0620
-SS_WAGE_BASE:        float = 184_500.0
-MEDICARE_RATE:       float = 0.0145
-MEDICARE_ADDL_RATE:  float = 0.0090   # additional above threshold
-MEDICARE_ADDL_THRESHOLD: dict[FilingStatus, float] = {
-    FilingStatus.SINGLE:            200_000,
-    FilingStatus.MARRIED:           250_000,
-    FilingStatus.HEAD_OF_HOUSEHOLD: 200_000,
+_NY_BRACKETS_MARRIED: dict[int, list[tuple[float, float, float]]] = {
+    2025: [
+        (0,          17_150, 0.0400),
+        (17_150,     23_600, 0.0450),
+        (23_600,     27_900, 0.0525),
+        (27_900,    161_550, 0.0550),
+        (161_550,   323_200, 0.0600),
+        (323_200, 2_155_350, 0.0685),
+        (2_155_350, 5_000_000, 0.0965),
+        (5_000_000, 25_000_000, 0.1030),
+        (25_000_000, float("inf"), 0.1090),
+    ],
+    2026: [
+        (0,          26_600, 0.0400),
+        (26_600,     36_500, 0.0450),
+        (36_500,     43_000, 0.0525),
+        (43_000,    323_200, 0.0585),
+        (323_200, 2_155_350, 0.0685),
+        (2_155_350, float("inf"), 0.1090),
+    ],
 }
 
-# New-York State 2026 brackets (single, annualized)
-_NY_BRACKETS_SINGLE: list[tuple[float, float, float]] = [
-    (0,          17_650, 0.0400),
-    (17_650,     24_300, 0.0450),
-    (24_300,     28_700, 0.0525),
-    (28_700,    166_050, 0.0585),
-    (166_050,   332_175, 0.0625),
-    (332_175, 2_218_185, 0.0685),
-    (2_218_185, float("inf"), 0.1090),
-]
-
-_NY_BRACKETS_MARRIED: list[tuple[float, float, float]] = [
-    (0,          26_600, 0.0400),
-    (26_600,     36_500, 0.0450),
-    (36_500,     43_000, 0.0525),
-    (43_000,    323_200, 0.0585),
-    (323_200,   2_155_350, 0.0685),
-    (2_155_350, float("inf"), 0.1090),
-]
-
-_NY_STD_DEDUCTION: dict[FilingStatus, float] = {
-    FilingStatus.SINGLE:            8_000,
-    FilingStatus.MARRIED:           16_050,
-    FilingStatus.HEAD_OF_HOUSEHOLD: 11_200,
+_NY_STD_DEDUCTION: dict[int, dict[FilingStatus, float]] = {
+    2025: {
+        FilingStatus.SINGLE:            8_000,
+        FilingStatus.MARRIED:           16_050,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 11_200,
+    },
+    2026: {
+        FilingStatus.SINGLE:            8_000,
+        FilingStatus.MARRIED:           16_050,
+        FilingStatus.HEAD_OF_HOUSEHOLD: 11_200,
+    },
 }
 
-NY_PFL_RATE: float = 0.00432
-NY_PFL_ANNUAL_CAP: float = 411.91
+_NY_PFL_RATE:       dict[int, float] = {2025: 0.00388, 2026: 0.00432}
+_NY_PFL_ANNUAL_CAP: dict[int, float] = {2025: 354.53,  2026: 411.91}
+
+# Backward-compatible aliases
+NY_PFL_RATE:      float = _NY_PFL_RATE[_DEFAULT_TAX_YEAR]
+NY_PFL_ANNUAL_CAP: float = _NY_PFL_ANNUAL_CAP[_DEFAULT_TAX_YEAR]
 
 # Approximate effective state tax rates for states without bracket tables here.
 # Use these as fallback when state_tax_rate is not explicitly provided.
@@ -141,6 +245,7 @@ def compute_federal_withholding(
     frequency:       PayFrequency,
     allowances:      int   = 0,
     additional_wh:   float = 0.0,
+    year:            int   = _DEFAULT_TAX_YEAR,
 ) -> float:
     """
     IRS Percentage Method withholding for one pay period.
@@ -148,47 +253,57 @@ def compute_federal_withholding(
     allowances: legacy W-4 allowances (each reduces annualized wage by $4,400).
     additional_wh: flat additional amount added to each period (new W-4 line 4c).
     """
+    yr           = _resolve_tax_year(year)
     periods      = PERIODS_PER_YEAR[frequency]
     annual_wage  = gross_period * periods
     allowance_val = 4_400 * allowances
-    taxable      = max(0.0, annual_wage - _STD_DEDUCTION[filing_status] - allowance_val)
-    annual_tax   = _bracketed_tax(taxable, _FEDERAL_BRACKETS[filing_status])
+    taxable      = max(0.0, annual_wage - _STD_DEDUCTION[yr][filing_status] - allowance_val)
+    annual_tax   = _bracketed_tax(taxable, _FEDERAL_BRACKETS[yr][filing_status])
     per_period   = round(annual_tax / periods, 2)
     return round(per_period + additional_wh, 2)
 
 
-def compute_social_security(gross_period: float, ytd_gross_before: float) -> float:
+def compute_social_security(
+    gross_period: float,
+    ytd_gross_before: float,
+    year: int = _DEFAULT_TAX_YEAR,
+) -> float:
     """SS withholding, capped at the annual wage base."""
-    remaining = max(0.0, SS_WAGE_BASE - ytd_gross_before)
+    yr        = _resolve_tax_year(year)
+    remaining = max(0.0, _SS_WAGE_BASE[yr] - ytd_gross_before)
     taxable   = min(gross_period, remaining)
-    return round(taxable * SS_RATE, 2)
+    return round(taxable * _SS_RATE[yr], 2)
 
 
 def compute_medicare(
     gross_period:     float,
     ytd_gross_before: float,
     filing_status:    FilingStatus = FilingStatus.SINGLE,
+    year:             int = _DEFAULT_TAX_YEAR,
 ) -> float:
     """Medicare withholding including 0.9% Additional Medicare Tax above threshold."""
-    base      = gross_period * MEDICARE_RATE
-    threshold = MEDICARE_ADDL_THRESHOLD[filing_status]
+    yr         = _resolve_tax_year(year)
+    base       = gross_period * _MEDICARE_RATE[yr]
+    threshold  = _MEDICARE_ADDL_THRESHOLD[yr][filing_status]
     prev_above = max(0.0, ytd_gross_before - threshold)
     cur_above  = max(0.0, ytd_gross_before + gross_period - threshold) - prev_above
-    return round(base + cur_above * MEDICARE_ADDL_RATE, 2)
+    return round(base + cur_above * _MEDICARE_ADDL_RATE[yr], 2)
 
 
 def compute_ny_state_tax(
     gross_period:  float,
     filing_status: FilingStatus,
     frequency:     PayFrequency,
+    year:          int = _DEFAULT_TAX_YEAR,
 ) -> float:
     """New York State income tax withholding (annualized percentage method)."""
+    yr           = _resolve_tax_year(year)
     periods      = PERIODS_PER_YEAR[frequency]
     annual_wage  = gross_period * periods
-    std_ded      = _NY_STD_DEDUCTION.get(filing_status, 8_000)
+    std_ded      = _NY_STD_DEDUCTION[yr].get(filing_status, 8_000)
     taxable      = max(0.0, annual_wage - std_ded)
-    brackets     = (_NY_BRACKETS_SINGLE if filing_status == FilingStatus.SINGLE
-                    else _NY_BRACKETS_MARRIED)
+    brackets     = (_NY_BRACKETS_SINGLE[yr] if filing_status == FilingStatus.SINGLE
+                    else _NY_BRACKETS_MARRIED[yr])
     annual_tax   = _bracketed_tax(taxable, brackets)
     return round(annual_tax / periods, 2)
 
@@ -199,6 +314,7 @@ def compute_state_tax(
     filing_status:  FilingStatus,
     frequency:      PayFrequency,
     override_rate:  float | None = None,
+    year:           int = _DEFAULT_TAX_YEAR,
 ) -> float:
     """
     State income tax withholding.
@@ -210,19 +326,25 @@ def compute_state_tax(
     if override_rate is not None:
         return round(gross_period * override_rate, 2)
     if state.upper() == "NY":
-        return compute_ny_state_tax(gross_period, filing_status, frequency)
+        return compute_ny_state_tax(gross_period, filing_status, frequency, year=year)
     rate = STATE_DEFAULT_RATES.get(state.upper(), 0.0)
     if rate is None:   # NY placeholder resolved above; None means "use brackets"
         rate = 0.0
     return round(gross_period * rate, 2)
 
 
-def compute_ny_paid_family_leave(gross_period: float, ytd_before: float) -> float:
+def compute_ny_paid_family_leave(
+    gross_period: float,
+    ytd_before: float,
+    year: int = _DEFAULT_TAX_YEAR,
+) -> float:
     """New York Paid Family Leave employee contribution."""
-    if ytd_before >= NY_PFL_ANNUAL_CAP:
+    yr = _resolve_tax_year(year)
+    cap = _NY_PFL_ANNUAL_CAP[yr]
+    if ytd_before >= cap:
         return 0.0
-    contribution = round(gross_period * NY_PFL_RATE, 2)
-    remaining_cap = max(0.0, round(NY_PFL_ANNUAL_CAP - ytd_before, 2))
+    contribution = round(gross_period * _NY_PFL_RATE[yr], 2)
+    remaining_cap = max(0.0, round(cap - ytd_before, 2))
     return round(min(contribution, remaining_cap), 2)
 
 
@@ -371,17 +493,22 @@ def compute_paystub_data(
     pay_period_end:   date,
     pay_date:         date,
     ytd:              YTDState | None = None,
+    tax_year:         int | None = None,
 ) -> dict:
     """
     Compute a complete paystub data dict from employee config and dates.
 
     ytd: accumulated YTD state *before* this period. Pass None for the first
          period of the year (everything starts at zero).
+    tax_year: override the tax year used for bracket/rate lookups.
+              Defaults to ``pay_date.year``.
 
     Returns a dict suitable for ``Paystub(**data)`` and ``generate_paystub_pdf(data)``.
     """
     if ytd is None:
         ytd = YTDState()
+
+    year = _resolve_tax_year(tax_year if tax_year is not None else pay_date.year)
 
     # ── Earnings ──────────────────────────────────────────────────────────────
     earnings_items = []
@@ -405,14 +532,14 @@ def compute_paystub_data(
     # ── Tax calculations ──────────────────────────────────────────────────────
     fed_wh   = compute_federal_withholding(
         federal_taxable, config.filing_status, config.frequency,
-        config.allowances, config.additional_federal_wh,
+        config.allowances, config.additional_federal_wh, year=year,
     )
-    ss       = compute_social_security(gross_current, ytd.gross)
-    medicare = compute_medicare(gross_current, ytd.gross, config.filing_status)
+    ss       = compute_social_security(gross_current, ytd.gross, year=year)
+    medicare = compute_medicare(gross_current, ytd.gross, config.filing_status, year=year)
     state_tx = compute_state_tax(
         federal_taxable, config.state,
         config.filing_status, config.frequency,
-        config.state_tax_rate_override,
+        config.state_tax_rate_override, year=year,
     )
 
     taxes: list[dict] = [
@@ -456,7 +583,7 @@ def compute_paystub_data(
 
     if config.state.upper() == "NY" and config.apply_ny_paid_family_leave:
         prior_pfl = ytd.deductions.get("NY Paid Family Leave", 0.0)
-        pfl_current = compute_ny_paid_family_leave(gross_current, prior_pfl)
+        pfl_current = compute_ny_paid_family_leave(gross_current, prior_pfl, year=year)
         if pfl_current:
             deductions.append({
                 "label": "NY Paid Family Leave",
