@@ -75,11 +75,12 @@ PROFILE_IMPORT_SUFFIXES = {
 }
 PROFILE_TYPES = ("company", "employee", "tax", "deduction", "assignment")
 SUPABASE_PROFILE_TABLE = "paystub_profile_records"
-GENERATION_MODES = {"single", "multiple"}
+GENERATION_MODES = {"single", "multiple", "full_year"}
 GENERATION_SEQUENCE_TYPES = {"pay_frequency", "weekly"}
 GENERATION_ANCHORS = {"initial", "latest"}
 GENERATION_AMOUNT_MODES = {"auto", "fixed", "manual"}
 MAX_BATCH_STUBS = 26
+MAX_FULL_YEAR_STUBS = 52
 
 
 def supabase_enabled(root: Path | None = None) -> bool:
@@ -572,6 +573,36 @@ def normalize_generation_plan(plan: dict | None) -> dict:
     if sequence_type not in GENERATION_SEQUENCE_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported sequence type: {sequence_type}")
 
+    frequency = _coerce_frequency(raw.get("pay_frequency"))
+
+    # ── full_year: derive stub_count from the year's pay periods ─────────────
+    if mode == "full_year":
+        try:
+            full_year_target = int(raw.get("full_year_target") or 0)
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Full-year target must be a valid year.") from exc
+        if full_year_target < 2020 or full_year_target > 2100:
+            raise HTTPException(status_code=400, detail="Full-year target year must be between 2020 and 2100.")
+        periods = get_pay_periods(full_year_target, frequency)
+        stub_count = len(periods)
+        sequence_type = "pay_frequency"
+        anchor = "initial"
+        amount_mode = str(raw.get("amount_mode", "auto") or "auto").strip().lower()
+        if amount_mode not in GENERATION_AMOUNT_MODES:
+            amount_mode = "auto"
+        fixed_amount = float(raw.get("fixed_amount", 0.0) or 0.0)
+        return {
+            "mode": mode,
+            "sequence_type": sequence_type,
+            "stub_count": stub_count,
+            "pay_frequency": frequency.value,
+            "anchor": anchor,
+            "amount_mode": amount_mode,
+            "fixed_amount": round(fixed_amount, 2),
+            "manual_amounts": [],
+            "full_year_target": full_year_target,
+        }
+
     try:
         stub_count = int(raw.get("stub_count", 1) or 1)
     except (TypeError, ValueError) as exc:
@@ -604,7 +635,7 @@ def normalize_generation_plan(plan: dict | None) -> dict:
         "mode": mode,
         "sequence_type": sequence_type,
         "stub_count": stub_count,
-        "pay_frequency": _coerce_frequency(raw.get("pay_frequency")).value,
+        "pay_frequency": frequency.value,
         "anchor": anchor,
         "amount_mode": amount_mode,
         "fixed_amount": round(fixed_amount, 2),
@@ -719,6 +750,20 @@ def build_generation_schedule(payload: dict | Paystub, plan: dict | None = None)
                 "payroll_check_number": paystub.payroll_check_number,
             }
         ]
+    elif normalized_plan["mode"] == "full_year":
+        full_year_target = normalized_plan["full_year_target"]
+        year_periods = get_pay_periods(full_year_target, frequency)
+        periods = []
+        for index, period in enumerate(year_periods):
+            periods.append(
+                {
+                    "sequence_number": index + 1,
+                    "pay_period_start": _format_iso_date(period.start),
+                    "pay_period_end": _format_iso_date(period.end),
+                    "pay_date": _format_iso_date(period.pay_date),
+                    "payroll_check_number": _increment_check_number(paystub.payroll_check_number, index),
+                }
+            )
     elif normalized_plan["sequence_type"] == "weekly":
         periods = _sequence_periods_by_days(paystub, normalized_plan["stub_count"], 7, anchor)
     else:
@@ -910,8 +955,10 @@ def generate_pdf_batch(
         for document in documents:
             archive.write(document["path"], Path(document["path"]).name)
 
+    resolved_mode = sequence["schedule"].get("mode", "multiple")
+
     return {
-        "mode": "multiple",
+        "mode": resolved_mode,
         "filename": zip_path.name,
         "path": str(zip_path),
         "template": template_value,

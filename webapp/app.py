@@ -133,7 +133,8 @@ async def preview_document(request: PreviewRequest) -> dict:
 
 @app.post("/api/generate")
 async def generate_document(request: GenerateRequest) -> dict:
-    if request.generation_plan and str(request.generation_plan.get("mode", "single")).lower() == "multiple":
+    plan_mode = str(request.generation_plan.get("mode", "single")).lower() if request.generation_plan else "single"
+    if plan_mode in ("multiple", "full_year"):
         result = service.generate_pdf_batch(
             request.paystub,
             template=request.template,

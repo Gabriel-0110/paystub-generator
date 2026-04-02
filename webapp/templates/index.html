@@ -115,8 +115,9 @@
                   <select id="generation_mode" name="generation_mode" aria-label="Generation mode">
                     <option value="single">Single Paystub</option>
                     <option value="multiple">Multiple Paystubs</option>
+                    <option value="full_year">Full Year</option>
                   </select>
-                  <small class="field-hint">Match the benchmark’s one-stub or add-dates workflow without changing your payroll data entry.</small>
+                  <small class="field-hint">Generate one stub, a custom multi-stub batch, or every pay period for an entire year.</small>
                 </label>
                 <label id="generation-sequence-field" class="field compact-field">
                   <span>Sequence type</span>
@@ -125,6 +126,14 @@
                     <option value="weekly">Weekly sequence generation</option>
                   </select>
                   <small class="field-hint">Use payroll frequency for weekly, biweekly, semi-monthly, or monthly periods. Use weekly for one-week sequences.</small>
+                </label>
+                <label id="generation-full-year-target-field" class="field compact-field" hidden>
+                  <span>Target year</span>
+                  <select id="generation_full_year_target" name="generation_full_year_target" aria-label="Target year">
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                  </select>
+                  <small class="field-hint">All pay periods for this year will be generated automatically based on the selected pay frequency.</small>
                 </label>
                 <label id="generation-frequency-field" class="field compact-field">
                   <span>Pay frequency</span>

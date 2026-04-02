@@ -86,6 +86,7 @@ const state = {
   generationAmountMode: "auto",
   generationFixedAmount: 0,
   generationManualAmountsText: "",
+  generationFullYearTarget: new Date().getFullYear(),
   preview: null,
   previewStale: false,
   working: "",
@@ -163,6 +164,7 @@ function cache() {
   els.generationAmountMode = document.getElementById("generation_amount_mode");
   els.generationFixedAmount = document.getElementById("generation_fixed_amount");
   els.generationManualAmountsList = document.getElementById("generation_manual_amounts_list");
+  els.generationFullYearTarget = document.getElementById("generation_full_year_target");
   els.generationPlanSummary = document.getElementById("generation-plan-summary");
   els.profileSummary = document.getElementById("profile-summary");
   els.assignmentSelect = document.getElementById("assignment-select");
@@ -253,7 +255,7 @@ function bind() {
     persistDraft();
   });
 
-  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor, els.generationAmountMode, els.generationFixedAmount].forEach((field) => {
+  [els.generationMode, els.generationSequenceType, els.generationPayFrequency, els.generationStubCount, els.generationAnchor, els.generationAmountMode, els.generationFixedAmount, els.generationFullYearTarget].forEach((field) => {
     field.addEventListener("change", handleGenerationInput);
     field.addEventListener("input", handleGenerationInput);
   });
@@ -434,6 +436,7 @@ function restoreDraft() {
     state.generationAmountMode = parsed.generationAmountMode || state.generationAmountMode;
     state.generationFixedAmount = Number(parsed.generationFixedAmount || state.generationFixedAmount);
     state.generationManualAmountsText = parsed.generationManualAmountsText || state.generationManualAmountsText;
+    state.generationFullYearTarget = Number(parsed.generationFullYearTarget || state.generationFullYearTarget);
     setDraftStatus("Restored your last local draft.");
   } catch {
     state.paystub = structuredClone(state.emptyPaystub);
@@ -457,8 +460,11 @@ function ensureDefaultSelections() {
   if (!FREQUENCY_OPTIONS.includes(state.generationPayFrequency)) {
     state.generationPayFrequency = "biweekly";
   }
-  if (!["single", "multiple"].includes(state.generationMode)) {
+  if (!["single", "multiple", "full_year"].includes(state.generationMode)) {
     state.generationMode = "single";
+  }
+  if (!Number.isFinite(state.generationFullYearTarget) || state.generationFullYearTarget < 2020 || state.generationFullYearTarget > 2100) {
+    state.generationFullYearTarget = new Date().getFullYear();
   }
   if (!["pay_frequency", "weekly"].includes(state.generationSequenceType)) {
     state.generationSequenceType = "pay_frequency";
@@ -486,6 +492,7 @@ function applyGenerationPlanDefaults(plan = {}) {
   state.generationAmountMode = plan.amount_mode || "auto";
   state.generationFixedAmount = Number(plan.fixed_amount || 0);
   state.generationManualAmountsText = (plan.manual_amounts || []).join("\n");
+  state.generationFullYearTarget = Number(plan.full_year_target || state.generationFullYearTarget);
 }
 
 function resetGenerationPlan() {
@@ -496,6 +503,7 @@ function resetGenerationPlan() {
   state.generationAmountMode = "auto";
   state.generationFixedAmount = 0;
   state.generationManualAmountsText = "";
+  state.generationFullYearTarget = new Date().getFullYear();
   syncGenerationFrequencyFromAssignment({ force: false });
 }
 
@@ -519,6 +527,7 @@ function handleGenerationInput(event) {
   state.generationAnchor = els.generationAnchor.value;
   state.generationAmountMode = els.generationAmountMode.value;
   state.generationFixedAmount = numberValue(els.generationFixedAmount.value);
+  state.generationFullYearTarget = Number(els.generationFullYearTarget.value || state.generationFullYearTarget);
   if (state.generationMode === "single") {
     state.generationStubCount = 1;
   }
@@ -535,15 +544,17 @@ function handleGenerationInput(event) {
 }
 
 function buildGenerationPlan() {
+  const isBatch = state.generationMode === "multiple" || state.generationMode === "full_year";
   return {
     mode: state.generationMode,
     sequence_type: state.generationSequenceType,
     pay_frequency: state.generationSequenceType === "weekly" ? "weekly" : state.generationPayFrequency,
     stub_count: state.generationMode === "multiple" ? state.generationStubCount : 1,
     anchor: state.generationAnchor,
-    amount_mode: state.generationAmountMode,
+    amount_mode: isBatch ? state.generationAmountMode : "auto",
     fixed_amount: state.generationAmountMode === "fixed" ? state.generationFixedAmount : 0,
     manual_amounts: state.generationAmountMode === "manual" ? parseManualAmounts(state.generationManualAmountsText) : [],
+    full_year_target: state.generationMode === "full_year" ? state.generationFullYearTarget : undefined,
   };
 }
 
@@ -1022,23 +1033,31 @@ function renderForm() {
   els.generationAnchor.value = state.generationAnchor;
   els.generationAmountMode.value = state.generationAmountMode;
   els.generationFixedAmount.value = String(state.generationFixedAmount ?? 0);
-  els.generationPayFrequency.disabled = state.generationMode === "single" || state.generationSequenceType === "weekly";
-  els.generationStubCount.value = String(state.generationMode === "multiple" ? state.generationStubCount : 1);
-  els.generationStubCount.disabled = state.generationMode === "single";
-  els.generationAnchor.disabled = state.generationMode === "single";
-  els.generationAmountMode.disabled = state.generationMode === "single";
-  els.generationFixedAmount.disabled = state.generationMode === "single" || state.generationAmountMode !== "fixed";
-  els.generateButton.textContent = state.generationMode === "multiple" ? "Generate Batch ZIP" : "Generate PDF";
-  document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", state.generationMode === "single");
+  els.generationFullYearTarget.value = String(state.generationFullYearTarget);
+
+  const isSingle = state.generationMode === "single";
+  const isMultiple = state.generationMode === "multiple";
+  const isFullYear = state.generationMode === "full_year";
+  const isBatch = isMultiple || isFullYear;
+
+  els.generationPayFrequency.disabled = isSingle || (isMultiple && state.generationSequenceType === "weekly");
+  els.generationStubCount.value = String(isMultiple ? state.generationStubCount : 1);
+  els.generationStubCount.disabled = !isMultiple;
+  els.generationAnchor.disabled = !isMultiple;
+  els.generationAmountMode.disabled = isSingle;
+  els.generationFixedAmount.disabled = isSingle || state.generationAmountMode !== "fixed";
+  els.generateButton.textContent = isBatch ? "Generate Batch ZIP" : "Generate PDF";
+  document.getElementById("generation-sequence-field")?.toggleAttribute("hidden", !isMultiple);
+  document.getElementById("generation-full-year-target-field")?.toggleAttribute("hidden", !isFullYear);
   document.getElementById("generation-frequency-field")?.toggleAttribute(
     "hidden",
-    state.generationMode === "single" || state.generationSequenceType === "weekly"
+    isSingle || (isMultiple && state.generationSequenceType === "weekly")
   );
-  document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", state.generationMode === "single");
-  document.getElementById("generation-anchor-field")?.toggleAttribute("hidden", state.generationMode === "single");
-  document.getElementById("generation-amount-mode-field")?.toggleAttribute("hidden", state.generationMode === "single");
-  document.getElementById("generation-fixed-amount-field")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "fixed");
-  document.getElementById("generation-manual-amounts-shell")?.toggleAttribute("hidden", state.generationMode === "single" || state.generationAmountMode !== "manual");
+  document.getElementById("generation-stub-count-field")?.toggleAttribute("hidden", !isMultiple);
+  document.getElementById("generation-anchor-field")?.toggleAttribute("hidden", !isMultiple);
+  document.getElementById("generation-amount-mode-field")?.toggleAttribute("hidden", isSingle);
+  document.getElementById("generation-fixed-amount-field")?.toggleAttribute("hidden", !isBatch || state.generationAmountMode !== "fixed");
+  document.getElementById("generation-manual-amounts-shell")?.toggleAttribute("hidden", !isMultiple || state.generationAmountMode !== "manual");
   renderManualAmountInputs();
   renderGenerationPlanSummary();
 
@@ -1133,14 +1152,17 @@ function renderForm() {
 function renderGenerationPlanSummary() {
   const plan = state.preview?.generation_plan || null;
   const isMultiple = state.generationMode === "multiple";
-  if (!isMultiple) {
+  const isFullYear = state.generationMode === "full_year";
+  if (!isMultiple && !isFullYear) {
     els.generationPlanSummary.classList.add("is-hidden");
     els.generationPlanSummary.innerHTML = "";
     return;
   }
 
-  const sequenceLabel = state.generationSequenceType === "weekly" ? "Weekly sequence generation" : "Custom pay periods";
-  const frequencyLabel = state.generationSequenceType === "weekly"
+  const sequenceLabel = isFullYear
+    ? `Full year ${state.generationFullYearTarget}`
+    : state.generationSequenceType === "weekly" ? "Weekly sequence generation" : "Custom pay periods";
+  const frequencyLabel = state.generationSequenceType === "weekly" && !isFullYear
     ? "Weekly"
     : state.generationPayFrequency.replace("semi", "semi-").replace(/\b\w/g, (char) => char.toUpperCase());
   const anchorLabel = state.generationAnchor === "latest" ? "Latest stub" : "Initial stub";
@@ -1162,9 +1184,13 @@ function renderGenerationPlanSummary() {
     )
     .join("");
 
+  const stubCountLabel = plan ? String(plan.stub_count) : isFullYear ? "All periods" : String(state.generationStubCount);
+
   const helperCopy = plan
     ? `Previewing ${plan.stub_count} scheduled ${plan.stub_count === 1 ? "stub" : "stubs"} from ${escapeHtml(plan.summary.first_pay_date)} through ${escapeHtml(plan.summary.last_pay_date)}.`
-    : "Refresh preview to validate the planned pay dates, pay periods, and YTD roll-forward before generating the batch ZIP.";
+    : isFullYear
+      ? `Refresh preview to build the full ${state.generationFullYearTarget} schedule and validate YTD accumulation before generating the batch ZIP.`
+      : "Refresh preview to validate the planned pay dates, pay periods, and YTD roll-forward before generating the batch ZIP.";
 
   els.generationPlanSummary.classList.remove("is-hidden");
   els.generationPlanSummary.innerHTML = `
@@ -1178,12 +1204,12 @@ function renderGenerationPlanSummary() {
         </div>
         <div class="generation-summary-row">
           <span>Count</span>
-          <strong>${escapeHtml(String(state.generationStubCount))}</strong>
+          <strong>${escapeHtml(stubCountLabel)}</strong>
         </div>
-        <div class="generation-summary-row">
+        ${isFullYear ? "" : `<div class="generation-summary-row">
           <span>Anchor</span>
           <strong>${escapeHtml(anchorLabel)}</strong>
-        </div>
+        </div>`}
         <div class="generation-summary-row">
           <span>Amounts</span>
           <strong>${escapeHtml(amountLabel)}</strong>
@@ -1283,7 +1309,7 @@ async function refreshPreview(silentMessage) {
     persistDraft();
     if (!silentMessage) {
       showMessage(
-        state.generationMode === "multiple"
+        state.generationMode === "multiple" || state.generationMode === "full_year"
           ? "Preview refreshed. The schedule and YTD roll-forward are aligned with the backend plan."
           : "Preview refreshed. Totals are now aligned with the backend model.",
         "success"
@@ -1318,7 +1344,7 @@ async function generatePdf() {
     renderPreview();
     persistDraft();
     triggerDownload(response.download_url, response.filename);
-    if (response.mode === "multiple") {
+    if (response.mode === "multiple" || response.mode === "full_year") {
       showMessage(downloadMessage("Batch generated successfully.", response.download_url, "Download the ZIP"), "success", {
         allowHtml: true,
       });
@@ -1525,6 +1551,12 @@ function validate() {
     }
   }
 
+  if (state.generationMode === "full_year") {
+    if (state.generationAmountMode === "fixed" && numberValue(state.generationFixedAmount) <= 0) {
+      errors.generation_fixed_amount = "Enter a fixed gross amount.";
+    }
+  }
+
   return errors;
 }
 
@@ -1690,6 +1722,10 @@ function persistDraft() {
       generationPayFrequency: state.generationPayFrequency,
       generationStubCount: state.generationStubCount,
       generationAnchor: state.generationAnchor,
+      generationAmountMode: state.generationAmountMode,
+      generationFixedAmount: state.generationFixedAmount,
+      generationManualAmountsText: state.generationManualAmountsText,
+      generationFullYearTarget: state.generationFullYearTarget,
     })
   );
   setDraftStatus("Draft saved locally.");
